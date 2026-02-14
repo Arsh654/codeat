@@ -4,11 +4,15 @@ import com.dsa.codeat.config.LlmProperties;
 import com.dsa.codeat.model.AnalyzeRequest;
 import com.dsa.codeat.model.AnalyzeResponse;
 import com.dsa.codeat.model.FailingScenario;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 @Service
 public class CodeEvaluationService {
+
+    private static final Logger log = LoggerFactory.getLogger(CodeEvaluationService.class);
 
     private final LlmScoringClient llmScoringClient;
     private final String modelUsed;
@@ -28,9 +32,11 @@ public class CodeEvaluationService {
     }
 
     public AnalyzeResponse analyze(AnalyzeRequest request) {
+        log.info("Analyze request received. problemIdHint={}, classNameHint={}",
+                request.problemId(), request.className());
         LlmScoreResult result = llmScoringClient.score(request);
 
-        return new AnalyzeResponse(
+        AnalyzeResponse response = new AnalyzeResponse(
                 emptyToNull(result.matchedProblemId()),
                 emptyToNull(result.matchedProblemTitle()),
                 result.accuracyPercentage(),
@@ -52,6 +58,13 @@ public class CodeEvaluationService {
                         .toList(),
                 modelUsed
         );
+
+        log.info("Analyze result. matchedProblemId={}, verdict={}, accuracy={}, confidence={}",
+                response.matchedProblemId(),
+                response.leetcodeLikelyVerdict(),
+                response.accuracyPercentage(),
+                response.confidencePercentage());
+        return response;
     }
 
     private String emptyToNull(String value) {

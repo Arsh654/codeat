@@ -4,6 +4,8 @@ import com.dsa.codeat.config.LlmProperties;
 import com.dsa.codeat.model.AnalyzeRequest;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.net.URI;
@@ -17,6 +19,7 @@ import java.util.Map;
 public class OpenAiLlmScoringClient implements LlmScoringClient {
 
     private static final Duration HTTP_TIMEOUT = Duration.ofSeconds(30);
+    private static final Logger log = LoggerFactory.getLogger(OpenAiLlmScoringClient.class);
 
     private final LlmProperties llmProperties;
     private final ObjectMapper objectMapper;
@@ -31,6 +34,7 @@ public class OpenAiLlmScoringClient implements LlmScoringClient {
     @Override
     public LlmScoreResult score(AnalyzeRequest request) {
         String prompt = buildPrompt(request);
+        log.info("LLM scoring started. provider={}, model={}", llmProperties.getProvider(), llmProperties.getModel());
 
         try {
             JsonNode result = requestCompletionAsJson(systemPrompt(), prompt);
@@ -97,7 +101,7 @@ public class OpenAiLlmScoringClient implements LlmScoringClient {
                 confidence = normalized.confidence();
             }
 
-            return new LlmScoreResult(
+            LlmScoreResult llmScoreResult = new LlmScoreResult(
                     matchedProblemId,
                     matchedProblemTitle,
                     accuracy,
@@ -111,10 +115,18 @@ public class OpenAiLlmScoringClient implements LlmScoringClient {
                     improvements,
                     failingScenarios
             );
+            log.info("LLM scoring completed. matchedProblemId={}, verdict={}, accuracy={}, confidence={}",
+                    llmScoreResult.matchedProblemId(),
+                    llmScoreResult.leetcodeLikelyVerdict(),
+                    llmScoreResult.accuracyPercentage(),
+                    llmScoreResult.confidencePercentage());
+            return llmScoreResult;
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
+            log.warn("LLM scoring interrupted");
             throw new IllegalStateException("Failed to call LLM scorer", e);
         } catch (IOException e) {
+            log.error("LLM scoring I/O failure: {}", e.getMessage());
             throw new IllegalStateException("Failed to call LLM scorer", e);
         }
     }

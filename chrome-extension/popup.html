@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Codeat Analyzer</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <main class="container">
+    <header class="header">
+      <h1>Codeat Analyzer</h1>
+      <div class="header-actions">
+        <button id="analyzeNow" class="link-btn" type="button">Analyze Now</button>
+        <button id="openOptions" class="link-btn" type="button">Settings</button>
+      </div>
+    </header>
+
+    <section class="card input-card">
+      <label for="problemId">Problem ID (optional)</label>
+      <input id="problemId" type="text" placeholder="e.g. two-sum">
+
+      <label for="className">Class Name (optional)</label>
+      <input id="className" type="text" placeholder="Solution">
+
+      <label for="problemStatement">Problem Statement (optional)</label>
+      <textarea id="problemStatement" rows="2" placeholder="Auto-filled when available"></textarea>
+
+      <div class="actions-row">
+        <button id="extractCode" type="button" class="secondary">Extract From Tab</button>
+      </div>
+
+      <label for="sourceCode">Source Code</label>
+      <textarea id="sourceCode" rows="8" placeholder="Auto-filled when available"></textarea>
+
+      <button id="analyze" type="button" class="primary">Analyze</button>
+      <p id="status" class="status" aria-live="polite"></p>
+    </section>
+
+    <section id="resultCard" class="card hidden">
+      <div class="result-toolbar">
+        <button id="analyzeAgain" type="button" class="primary compact">Analyze Again</button>
+      </div>
+      <div class="result-head">
+        <div>
+          <p class="label">Correctness</p>
+          <p class="metric" id="accuracyValue">--</p>
+        </div>
+        <div>
+          <p class="label">Confidence</p>
+          <p class="metric" id="confidenceValue">--</p>
+        </div>
+        <div>
+          <p class="label">Verdict</p>
+          <p class="verdict" id="verdictPill">--</p>
+        </div>
+      </div>
+
+      <div class="key-grid">
+        <div>
+          <p class="label">Matched Problem</p>
+          <p id="matchedProblem">--</p>
+        </div>
+        <div>
+          <p class="label">Compile Likely Valid</p>
+          <p id="compileLikely">--</p>
+        </div>
+      </div>
+
+      <div class="section">
+        <p class="label">Feedback</p>
+        <p id="feedbackText" class="body-text">--</p>
+      </div>
+
+      <div class="section">
+        <p class="label">Strengths</p>
+        <ul id="strengthList" class="list"></ul>
+      </div>
+
+      <div class="section">
+        <p class="label">Improvements</p>
+        <ul id="improvementList" class="list"></ul>
+      </div>
+
+      <div class="section">
+        <p class="label">Likely Failing Scenarios</p>
+        <ul id="scenarioList" class="list"></ul>
+      </div>
+    </section>
+  </main>
+
+  <script src="popup.js"></script>
+</body>
+</html>

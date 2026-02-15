@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "Codeat Analyzer",
+  "description": "Analyze DSA solution correctness using your Codeat API.",
+  "version": "0.3.0",
+  "permissions": ["storage", "activeTab", "scripting", "tabs"],
+  "host_permissions": ["<all_urls>"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_title": "Codeat Analyzer",
+    "default_popup": "popup.html"
+  },
+  "options_page": "options.html"
+}

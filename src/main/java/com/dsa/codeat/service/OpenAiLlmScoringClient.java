@@ -20,6 +20,7 @@ public class OpenAiLlmScoringClient implements LlmScoringClient {
 
     private static final Duration HTTP_TIMEOUT = Duration.ofSeconds(30);
     private static final Logger log = LoggerFactory.getLogger(OpenAiLlmScoringClient.class);
+    private static final int MIN_STRONG_EVIDENCE_TESTS = 20;
 
     private final LlmProperties llmProperties;
     private final ObjectMapper objectMapper;
@@ -78,7 +79,16 @@ public class OpenAiLlmScoringClient implements LlmScoringClient {
             if (isStrongPassEvidence(accuracy, confidence, estimatedPassed, estimatedTotal, compileLikelyValid)) {
                 verdict = "PASS";
             }
-            if (shouldPromoteToPass(matchedProblemId, matchedProblemTitle, accuracy, confidence, compileLikelyValid, failingScenarios)) {
+            if (shouldPromoteToPass(
+                    matchedProblemId,
+                    matchedProblemTitle,
+                    accuracy,
+                    confidence,
+                    estimatedPassed,
+                    estimatedTotal,
+                    compileLikelyValid,
+                    failingScenarios
+            )) {
                 verdict = "PASS";
             }
             if ("PASS".equals(verdict)) {
@@ -100,6 +110,19 @@ public class OpenAiLlmScoringClient implements LlmScoringClient {
                 accuracy = normalized.accuracy();
                 confidence = normalized.confidence();
             }
+
+            VerdictScore strictScore = applyStrictEvidenceCalibration(
+                    verdict,
+                    accuracy,
+                    confidence,
+                    estimatedPassed,
+                    estimatedTotal,
+                    compileLikelyValid,
+                    failingScenarios.size()
+            );
+            verdict = strictScore.verdict();
+            accuracy = strictScore.accuracy();
+            confidence = strictScore.confidence();
 
             LlmScoreResult llmScoreResult = new LlmScoreResult(
                     matchedProblemId,
@@ -262,10 +285,14 @@ public class OpenAiLlmScoringClient implements LlmScoringClient {
         if (!compileLikelyValid) {
             return "FAIL";
         }
-        if (estimatedTotal > 0 && estimatedPassed == estimatedTotal && failingScenarios.isEmpty()) {
+        if (estimatedTotal >= MIN_STRONG_EVIDENCE_TESTS
+                && estimatedPassed == estimatedTotal
+                && accuracy >= 99.0
+                && confidence >= 93.0
+                && failingScenarios.isEmpty()) {
             return "PASS";
         }
-        if (estimatedTotal > 0 && passRate >= 0.95 && accuracy >= 95.0 && confidence > 90.0 && failingScenarios.isEmpty()) {
+        if (estimatedTotal >= 10 && passRate >= 0.95 && accuracy >= 95.0 && confidence >= 88.0 && failingScenarios.isEmpty()) {
             return "MAY_PASS";
         }
         if (estimatedTotal > 0 && estimatedPassed < estimatedTotal) {
@@ -416,16 +443,25 @@ public class OpenAiLlmScoringClient implements LlmScoringClient {
             String matchedProblemTitle,
             double accuracy,
             double confidence,
+            int estimatedPassed,
+            int estimatedTotal,
             boolean compileLikelyValid,
             List<FailingScenarioResult> failingScenarios
     ) {
         if (!compileLikelyValid || !failingScenarios.isEmpty()) {
             return false;
         }
-        if (accuracy >= 99.0) {
+        if (estimatedTotal >= MIN_STRONG_EVIDENCE_TESTS
+                && estimatedPassed == estimatedTotal
+                && accuracy >= 99.5
+                && confidence >= 96.0) {
             return true;
         }
-        return isLikelyTwoSum(matchedProblemId, matchedProblemTitle) && accuracy >= 99.0 && confidence >= 90.0;
+        return isLikelyTwoSum(matchedProblemId, matchedProblemTitle)
+                && estimatedTotal >= MIN_STRONG_EVIDENCE_TESTS
+                && estimatedPassed == estimatedTotal
+                && accuracy >= 99.5
+                && confidence >= 96.0;
     }
 
     private boolean isStrongPassEvidence(
@@ -441,7 +477,82 @@ public class OpenAiLlmScoringClient implements LlmScoringClient {
         if (estimatedTotal <= 0) {
             return false;
         }
-        return estimatedPassed == estimatedTotal && accuracy >= 99.0 && confidence >= 95.0;
+        return estimatedTotal >= MIN_STRONG_EVIDENCE_TESTS
+                && estimatedPassed == estimatedTotal
+                && accuracy >= 99.5
+                && confidence >= 97.0;
+    }
+
+    private VerdictScore applyStrictEvidenceCalibration(
+            String verdict,
+            double accuracy,
+            double confidence,
+            int estimatedPassed,
+            int estimatedTotal,
+            boolean compileLikelyValid,
+            int scenarioCount
+    ) {
+        String calibratedVerdict = verdict;
+        double calibratedAccuracy = accuracy;
+        double calibratedConfidence = confidence;
+        double passRate = estimatedTotal > 0 ? (estimatedPassed * 1.0) / estimatedTotal : -1.0;
+
+        if (!compileLikelyValid) {
+            calibratedVerdict = "FAIL";
+            calibratedAccuracy = Math.min(calibratedAccuracy, 70.0);
+            calibratedConfidence = Math.min(calibratedConfidence, 72.0);
+        }
+
+        if (scenarioCount > 0 && "PASS".equals(calibratedVerdict)) {
+            calibratedVerdict = "FAIL";
+        }
+
+        if (estimatedTotal <= 0) {
+            if ("PASS".equals(calibratedVerdict)) {
+                calibratedVerdict = "UNCERTAIN";
+            }
+            calibratedAccuracy = Math.min(calibratedAccuracy, 88.0);
+            calibratedConfidence = Math.min(calibratedConfidence, 72.0);
+        }
+
+        if ("PASS".equals(calibratedVerdict)) {
+            boolean strongEvidence = estimatedTotal >= MIN_STRONG_EVIDENCE_TESTS
+                    && estimatedPassed == estimatedTotal
+                    && scenarioCount == 0
+                    && calibratedAccuracy >= 99.5
+                    && calibratedConfidence >= 97.0;
+            if (!strongEvidence) {
+                calibratedVerdict = "MAY_PASS";
+                calibratedAccuracy = Math.min(calibratedAccuracy, 98.0);
+                calibratedConfidence = Math.min(calibratedConfidence, 92.0);
+            }
+        }
+
+        if ("MAY_PASS".equals(calibratedVerdict)) {
+            calibratedAccuracy = Math.min(calibratedAccuracy, 97.0);
+            calibratedConfidence = Math.min(calibratedConfidence, 90.0);
+            if (estimatedTotal > 0 && passRate < 0.95) {
+                calibratedVerdict = "UNCERTAIN";
+                calibratedAccuracy = Math.min(calibratedAccuracy, 92.0);
+                calibratedConfidence = Math.min(calibratedConfidence, 80.0);
+            }
+        }
+
+        if ("UNCERTAIN".equals(calibratedVerdict)) {
+            calibratedAccuracy = Math.min(calibratedAccuracy, 92.0);
+            calibratedConfidence = Math.min(calibratedConfidence, 78.0);
+        }
+
+        if ("FAIL".equals(calibratedVerdict)) {
+            calibratedAccuracy = Math.min(calibratedAccuracy, 85.0);
+            calibratedConfidence = Math.min(calibratedConfidence, 82.0);
+        }
+
+        return new VerdictScore(
+                calibratedVerdict,
+                clampPercent(calibratedAccuracy),
+                clampPercent(calibratedConfidence)
+        );
     }
 
     private ScorePair normalizeNonPassScores(
@@ -535,6 +646,13 @@ public class OpenAiLlmScoringClient implements LlmScoringClient {
     }
 
     private record ScorePair(
+            double accuracy,
+            double confidence
+    ) {
+    }
+
+    private record VerdictScore(
+            String verdict,
             double accuracy,
             double confidence
     ) {

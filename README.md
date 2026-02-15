@@ -17,7 +17,7 @@ API service to evaluate Java DSA submissions using an LLM and return:
 ./mvnw spring-boot:run
 ```
 
-Service runs on default Spring port `8080`.
+Service runs on port `3502` (see `src/main/resources/application.yml`).
 
 ## Environment Variables
 
@@ -104,6 +104,42 @@ Response shape:
 ```bash
 ./mvnw test
 ```
+
+## Chrome Extension (MVP)
+
+A Chrome extension scaffold is available in `chrome-extension/`.
+
+### Load in Chrome
+
+1. Open `chrome://extensions`
+2. Enable `Developer mode`
+3. Click `Load unpacked`
+4. Select the `chrome-extension` folder
+
+### Configure
+
+1. Open extension `Settings`
+2. Set:
+   - `API Base URL`: `http://localhost:3502`
+   - `Analyze Path`: `/api/v1/analyze`
+
+### Use
+
+1. Open a coding page with visible source code.
+2. The extension shows an in-page floating widget with correctness, confidence, verdict, and feedback.
+3. Open the extension popup for curated insights (strengths, improvements, likely failing scenarios).
+4. You can still click `Extract From Tab` or `Analyze` manually if needed.
+
+The extension sends a request to your backend and displays relevant result signals in both the page widget and popup.
+
+### Auto Badge Behavior
+
+- Without opening the popup, the extension analyzes detected code on the active tab.
+- The extension icon badge shows estimated correctness percentage (e.g. `92%`).
+- Badge color maps to verdict:
+  - Green: `PASS`
+  - Orange: `MAY_PASS`
+  - Red: `FAIL`
 
 ## Current Limitations
 - LLM-based evaluation can still be noisy for edge cases.

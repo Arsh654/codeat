@@ -18,7 +18,10 @@ public class ApiExceptionHandler {
 
     @ExceptionHandler(IllegalStateException.class)
     public ResponseEntity<Map<String, String>> handleServerError(IllegalStateException ex) {
+        String errorMessage = ex.getMessage() != null && !ex.getMessage().isBlank()
+            ? ex.getMessage()
+            : "Evaluation engine error";
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(Map.of("error", "Evaluation engine error"));
+                .body(Map.of("error", errorMessage));
     }
 }

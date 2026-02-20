@@ -14,6 +14,7 @@ public record LlmScoreResult(
         String feedback,
         List<String> strengths,
         List<String> improvements,
-        List<FailingScenarioResult> failingScenarios
+        List<FailingScenarioResult> failingScenarios,
+        String modelUsed
 ) {
 }

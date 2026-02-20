@@ -10,3 +10,11 @@ llm:
   api-url: ${LLM_API_URL:}
   api-key: ${LLM_API_KEY:${GROQ_API_KEY:}}
   model: ${LLM_MODEL:gpt-4o-mini}
+  request-delay-ms: ${LLM_REQUEST_DELAY_MS:3000}
+  fallback:
+    enabled: ${LLM_FALLBACK_ENABLED:true}
+    provider: ${LLM_FALLBACK_PROVIDER:openrouter}
+    api-url: ${LLM_FALLBACK_API_URL:}
+    api-key: ${LLM_FALLBACK_API_KEY:${OPENROUTER_API_KEY:}}
+    model: ${LLM_FEEDBACK_MODEL:arcee-ai/trinity-large-preview:free}
+#    model: ${LLM_FALLBACK_MODEL:openrouter/free}

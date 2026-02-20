@@ -22,7 +22,7 @@ Service runs on port `3502` (see `src/main/resources/application.yml`).
 ## Environment Variables
 
 ```bash
-# Provider: openai | groq
+# Primary LLM Provider: openai | groq | openrouter
 export LLM_PROVIDER=groq
 
 # Use one of the keys below
@@ -33,11 +33,101 @@ export LLM_API_KEY=your_openai_key
 # Optional
 export LLM_MODEL=llama-3.3-70b-versatile
 export LLM_API_URL= # optional override; provider defaults are auto-resolved
+
+# Rate Limiting (prevents hitting API limits)
+export LLM_REQUEST_DELAY_MS=3000  # 3 second delay between requests (default: 3000)
+
+# Fallback Configuration (optional, disabled by default for dev)
+export LLM_FALLBACK_ENABLED=false  # set to true to enable fallback
+export LLM_FALLBACK_PROVIDER=openrouter  # openai | groq | openrouter
+export OPENROUTER_API_KEY=your_openrouter_key  # only needed if fallback enabled
+export LLM_FALLBACK_MODEL=meta-llama/llama-3.2-3b-instruct  # cheap pay-per-use
+# export LLM_FALLBACK_API_URL= # optional override
 ```
 
 Provider defaults:
 - `openai` -> `https://api.openai.com/v1/chat/completions`
 - `groq` -> `https://api.groq.com/openai/v1/chat/completions`
+- `openrouter` -> `https://openrouter.ai/api/v1/chat/completions`
+
+### Fallback Mechanism
+
+When the primary LLM hits rate limit (HTTP 429), the service automatically switches to the fallback provider if configured. This ensures uninterrupted analysis even during high usage periods.
+
+**Recommended Development Setup (Groq only, no fallback):**
+```bash
+export LLM_PROVIDER=groq
+export GROQ_API_KEY=your_groq_key
+export LLM_MODEL=llama-3.3-70b-versatile
+
+# 3 second delay prevents rate limits on Groq free tier
+export LLM_REQUEST_DELAY_MS=3000
+
+# Disable fallback for simpler development
+export LLM_FALLBACK_ENABLED=false
+```
+
+### Recommended Setup for Development
+
+**Option 1: Single Provider with Rate Limiting (Recommended)**
+```bash
+export LLM_PROVIDER=groq
+export GROQ_API_KEY=your_groq_key
+export LLM_MODEL=llama-3.3-70b-versatile
+
+# Increase delay to avoid rate limits (3-5 seconds)
+export LLM_REQUEST_DELAY_MS=3000
+
+# Disable fallback (Groq free tier is usually sufficient)
+export LLM_FALLBACK_ENABLED=false
+```
+
+**Option 2: Fallback with Pay-Per-Use Models**
+```bash
+export LLM_PROVIDER=groq
+export GROQ_API_KEY=your_groq_key
+
+export LLM_FALLBACK_ENABLED=true
+export LLM_FALLBACK_PROVIDER=openrouter
+export OPENROUTER_API_KEY=your_openrouter_key
+
+# These models are cheap (~$0.10 per 1M tokens)
+export LLM_FALLBACK_MODEL=meta-llama/llama-3.2-3b-instruct      # Very cheap
+# OR
+export LLM_FALLBACK_MODEL=google/gemini-flash-1.5               # Fast & cheap
+# OR
+export LLM_FALLBACK_MODEL=qwen/qwen-2-7b-instruct               # Good quality
+```
+
+**Note:** OpenRouter's truly free models (`:free` suffix) are very limited and often unavailable. The pay-per-use models listed above are extremely cheap for testing (usually < $0.50 for hundreds of analyses).
+
+### Rate Limiting Configuration
+
+To avoid hitting rate limits, add a delay between requests:
+
+```bash
+# Recommended: 3 seconds between API calls
+export LLM_REQUEST_DELAY_MS=3000
+
+# Conservative: 5 seconds (almost never hits limits)
+export LLM_REQUEST_DELAY_MS=5000
+
+# Aggressive: 1 second (may hit limits on free tier)
+export LLM_REQUEST_DELAY_MS=1000
+```
+
+### Tips to Avoid Rate Limits
+
+1. **Use the cache** - Extension caches results when code doesn't change
+2. **Don't spam "Analyze Again"** - Wait a few seconds between analyses
+3. **Increase backend delay** - Set `LLM_REQUEST_DELAY_MS=3000` or higher
+4. **Auto-analysis waits 5 seconds** - Extension debounces automatic tab analysis
+5. **Use one provider** - Disable fallback to simplify: `LLM_FALLBACK_ENABLED=false`
+
+**For Groq Free Tier Limits:**
+- 30 requests/minute for llama-3.3-70b-versatile
+- With 3 second delay, you'll do ~20 requests/minute = safe ✅
+- Each analysis = 2-3 API calls = ~8 analyses/minute max
 
 ## API Endpoints
 

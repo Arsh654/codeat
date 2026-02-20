@@ -25,6 +25,8 @@ public class OpenAiLlmScoringClient implements LlmScoringClient {
     private final LlmProperties llmProperties;
     private final ObjectMapper objectMapper;
     private final HttpClient httpClient;
+    private boolean usedFallback = false;
+    private long lastRequestTime = 0;
 
     public OpenAiLlmScoringClient(LlmProperties llmProperties) {
         this.llmProperties = llmProperties;
@@ -34,6 +36,7 @@ public class OpenAiLlmScoringClient implements LlmScoringClient {
 
     @Override
     public LlmScoreResult score(AnalyzeRequest request) {
+        usedFallback = false;
         String prompt = buildPrompt(request);
         log.info("LLM scoring started. provider={}, model={}", llmProperties.getProvider(), llmProperties.getModel());
 
@@ -124,6 +127,10 @@ public class OpenAiLlmScoringClient implements LlmScoringClient {
             accuracy = strictScore.accuracy();
             confidence = strictScore.confidence();
 
+            String actualModelUsed = usedFallback
+                ? llmProperties.getFallback().getModel()
+                : llmProperties.getModel();
+
             LlmScoreResult llmScoreResult = new LlmScoreResult(
                     matchedProblemId,
                     matchedProblemTitle,
@@ -136,9 +143,15 @@ public class OpenAiLlmScoringClient implements LlmScoringClient {
                     feedback,
                     strengths,
                     improvements,
-                    failingScenarios
+                    failingScenarios,
+                    actualModelUsed
             );
-            log.info("LLM scoring completed. matchedProblemId={}, verdict={}, accuracy={}, confidence={}",
+            String providerUsed = usedFallback
+                ? llmProperties.getFallback().getProvider() + " (fallback)"
+                : llmProperties.getProvider();
+            log.info("LLM scoring completed. provider={}, model={}, matchedProblemId={}, verdict={}, accuracy={}, confidence={}",
+                    providerUsed,
+                    actualModelUsed,
                     llmScoreResult.matchedProblemId(),
                     llmScoreResult.leetcodeLikelyVerdict(),
                     llmScoreResult.accuracyPercentage(),
@@ -155,9 +168,44 @@ public class OpenAiLlmScoringClient implements LlmScoringClient {
     }
 
     private JsonNode requestCompletionAsJson(String systemPrompt, String userPrompt) throws IOException, InterruptedException {
+        applyRateLimit();
+        try {
+            return callLlmApi(
+                llmProperties.resolvedApiUrl(),
+                llmProperties.getApiKey(),
+                llmProperties.getModel(),
+                systemPrompt,
+                userPrompt,
+                false
+            );
+        } catch (IllegalStateException e) {
+            if (e.getMessage().contains("Rate limit exceeded") && llmProperties.getFallback().isEnabled()) {
+                log.warn("Primary LLM rate limited, attempting fallback to {}", llmProperties.getFallback().getProvider());
+                usedFallback = true;
+                return callLlmApi(
+                    llmProperties.resolvedFallbackApiUrl(),
+                    llmProperties.getFallback().getApiKey(),
+                    llmProperties.getFallback().getModel(),
+                    systemPrompt,
+                    userPrompt,
+                    true
+                );
+            }
+            throw e;
+        }
+    }
+
+    private JsonNode callLlmApi(
+            String apiUrl,
+            String apiKey,
+            String model,
+            String systemPrompt,
+            String userPrompt,
+            boolean isFallback
+    ) throws IOException, InterruptedException {
         String requestBody = objectMapper.writeValueAsString(
                 Map.of(
-                        "model", llmProperties.getModel(),
+                        "model", model,
                         "temperature", 0.1,
                         "messages", List.of(
                                 Map.of("role", "system", "content", systemPrompt),
@@ -166,17 +214,34 @@ public class OpenAiLlmScoringClient implements LlmScoringClient {
                 )
         );
 
-        HttpRequest httpRequest = HttpRequest.newBuilder()
-                .uri(URI.create(llmProperties.resolvedApiUrl()))
+        HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
+                .uri(URI.create(apiUrl))
                 .timeout(HTTP_TIMEOUT)
-                .header("Authorization", "Bearer " + llmProperties.getApiKey())
+                .header("Authorization", "Bearer " + apiKey)
                 .header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(requestBody))
-                .build();
+                .POST(HttpRequest.BodyPublishers.ofString(requestBody));
 
+        if (apiUrl.contains("openrouter.ai")) {
+            requestBuilder.header("HTTP-Referer", "https://github.com/codeat-dsa-analyzer");
+            requestBuilder.header("X-Title", "Codeat DSA Analyzer");
+        }
+
+        HttpRequest httpRequest = requestBuilder.build();
         HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+
+        if (response.statusCode() == 429) {
+            String provider = isFallback ? "Fallback LLM" : "Primary LLM";
+            throw new IllegalStateException("Rate limit exceeded on " + provider + ". Please wait before analyzing again.");
+        }
+        if (response.statusCode() == 401) {
+            String provider = isFallback ? "fallback" : "primary";
+            throw new IllegalStateException("Invalid API key for " + provider + " LLM. Please check configuration.");
+        }
         if (response.statusCode() >= 400) {
-            throw new IllegalStateException("LLM request failed with status " + response.statusCode());
+            String errorDetail = response.body() != null && response.body().length() < 200
+                ? " - " + response.body()
+                : "";
+            throw new IllegalStateException("LLM request failed with status " + response.statusCode() + errorDetail);
         }
 
         JsonNode root = objectMapper.readTree(response.body());
@@ -637,6 +702,26 @@ public class OpenAiLlmScoringClient implements LlmScoringClient {
             return "N/A";
         }
         return value.trim();
+    }
+
+    private void applyRateLimit() throws InterruptedException {
+        long delayMs = llmProperties.getRequestDelayMs();
+        if (delayMs <= 0) {
+            return;
+        }
+
+        synchronized (this) {
+            long now = System.currentTimeMillis();
+            long timeSinceLastRequest = now - lastRequestTime;
+
+            if (timeSinceLastRequest < delayMs) {
+                long sleepTime = delayMs - timeSinceLastRequest;
+                log.debug("Rate limiting: sleeping for {}ms", sleepTime);
+                Thread.sleep(sleepTime);
+            }
+
+            lastRequestTime = System.currentTimeMillis();
+        }
     }
 
     private record PassChallengeResult(

@@ -15,25 +15,28 @@ public class CodeEvaluationService {
     private static final Logger log = LoggerFactory.getLogger(CodeEvaluationService.class);
 
     private final LlmScoringClient llmScoringClient;
-    private final String modelUsed;
 
     @Autowired
-    public CodeEvaluationService(LlmScoringClient llmScoringClient, LlmProperties llmProperties) {
-        this(llmScoringClient, llmProperties.getModel());
-    }
-
-    private CodeEvaluationService(LlmScoringClient llmScoringClient, String modelUsed) {
+    public CodeEvaluationService(LlmScoringClient llmScoringClient) {
         this.llmScoringClient = llmScoringClient;
-        this.modelUsed = modelUsed;
     }
 
-    static CodeEvaluationService forTesting(LlmScoringClient llmScoringClient, String modelUsed) {
-        return new CodeEvaluationService(llmScoringClient, modelUsed);
+    static CodeEvaluationService forTesting(LlmScoringClient llmScoringClient) {
+        return new CodeEvaluationService(llmScoringClient);
     }
 
     public AnalyzeResponse analyze(AnalyzeRequest request) {
-        log.info("Analyze request received. problemIdHint={}, classNameHint={}",
-                request.problemId(), request.className());
+        log.info("Analyze request received. problemIdHint={}, classNameHint={}, codeLength={}",
+                request.problemId(), request.className(),
+                request.sourceCode() != null ? request.sourceCode().length() : 0);
+
+        try {
+            validateCodeIsNotSkeleton(request.sourceCode());
+        } catch (IllegalArgumentException e) {
+            log.warn("Code validation failed: {}", e.getMessage());
+            throw e;
+        }
+
         LlmScoreResult result = llmScoringClient.score(request);
 
         AnalyzeResponse response = new AnalyzeResponse(
@@ -56,7 +59,7 @@ public class CodeEvaluationService {
                                 s.reason()
                         ))
                         .toList(),
-                modelUsed
+                result.modelUsed()
         );
 
         log.info("Analyze result. matchedProblemId={}, verdict={}, accuracy={}, confidence={}",
@@ -72,5 +75,55 @@ public class CodeEvaluationService {
             return null;
         }
         return value.trim();
+    }
+
+    private void validateCodeIsNotSkeleton(String sourceCode) {
+        if (sourceCode == null || sourceCode.isBlank()) {
+            throw new IllegalArgumentException("Source code cannot be empty");
+        }
+
+        String trimmed = sourceCode.trim();
+
+        // Very minimal check - just ensure it's not tiny
+        if (trimmed.length() < 25) {
+            throw new IllegalArgumentException("Code is too short to analyze");
+        }
+
+        // Only reject obvious empty skeletons
+        if (isObviouslyEmptySkeleton(trimmed)) {
+            throw new IllegalArgumentException("Code appears to be an empty template without implementation");
+        }
+    }
+
+    private boolean isObviouslyEmptySkeleton(String sourceCode) {
+        // Remove all whitespace and comments for analysis
+        String compressed = sourceCode
+                .replaceAll("//[^\\r\\n]*", "")
+                .replaceAll("/\\*[\\s\\S]*?\\*/", "")
+                .replaceAll("\\s+", "");
+
+        // Check for pattern: class Name { method(...) { } }
+        // This is a very simple heuristic - only catches the most obvious empty cases
+
+        // Must have a class
+        if (!compressed.contains("class")) {
+            return false;
+        }
+
+        // Count braces
+        int openBraces = 0;
+        int closeBraces = 0;
+        for (char c : compressed.toCharArray()) {
+            if (c == '{') openBraces++;
+            if (c == '}') closeBraces++;
+        }
+
+        // If there are only 2 pairs of braces (class + one method), and code is short, likely empty
+        if (openBraces == 2 && closeBraces == 2 && compressed.length() < 100) {
+            // Check if it contains empty method body: ){}
+            return compressed.contains("){}");
+        }
+
+        return false;
     }
 }

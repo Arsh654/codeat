@@ -6,7 +6,20 @@ server:
   port: 3502
 
 llm:
+  # Primary LLM Configuration
+  # Supported providers: openai | groq | openrouter | cerebras
   provider: ${LLM_PROVIDER:openai}
   api-url: ${LLM_API_URL:}
-  api-key: ${LLM_API_KEY:${GROQ_API_KEY:}}
+  api-key: ${LLM_API_KEY:${GROQ_API_KEY:${CEREBRAS_API_KEY:}}}
   model: ${LLM_MODEL:gpt-4o-mini}
+
+  # Rate limiting: delay in milliseconds between API requests (prevents rate limits)
+  request-delay-ms: ${LLM_REQUEST_DELAY_MS:3000}
+
+  # Fallback Configuration (used when primary hits rate limit)
+  fallback:
+    enabled: ${LLM_FALLBACK_ENABLED:true}
+    provider: ${LLM_FALLBACK_PROVIDER}
+    api-url: ${LLM_FALLBACK_API_URL:}
+    api-key: ${LLM_FALLBACK_API_KEY}
+    model: ${LLM_FALLBACK_MODEL:gpt-oss-120b}

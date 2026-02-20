@@ -10,7 +10,16 @@
   },
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
+      "matches": [
+        "*://*.leetcode.com/*",
+        "*://*.hackerrank.com/*",
+        "*://*.geeksforgeeks.org/*",
+        "*://*.codeforces.com/*",
+        "*://*.interviewbit.com/*",
+        "*://*.lintcode.com/*",
+        "*://localhost/*",
+        "*://127.0.0.1/*"
+      ],
       "js": ["content.js"],
       "run_at": "document_idle"
     }

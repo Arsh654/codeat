@@ -40,17 +40,55 @@ async function init() {
   };
 
   wireEvents();
-  setStatus("Detecting code and metadata from active tab...");
+
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!isAnalyzableUrl(tab?.url || "")) {
+    setStatus("Open a supported coding platform (e.g. LeetCode) to auto-detect code.");
+    return;
+  }
+
+  setStatus("Detecting code from active tab...");
 
   const extracted = await extractContextFromActiveTab();
   if (!extracted.sourceCode) {
     setStatus("No code auto-detected. Use Extract From Tab or paste code.");
+    clearResult();
+    return;
+  }
+
+  if (extracted.sourceCode.length < 20) {
+    populateForm(extracted);
+    setStatus("Code too short to analyze meaningfully.", true);
+    clearResult();
     return;
   }
 
   populateForm(extracted);
-  setStatus("Code detected. Running analysis...");
-  await onAnalyze();
+  setStatus("Code detected. Click 'Analyze' to start analysis.");
+  clearResult();
+}
+
+function isAnalyzableUrl(url) {
+  if (!url) {
+    return false;
+  }
+  const supportedPlatforms = [
+    "leetcode.com",
+    "hackerrank.com",
+    "geeksforgeeks.org",
+    "codeforces.com",
+    "interviewbit.com",
+    "lintcode.com",
+    "localhost",
+    "127.0.0.1"
+  ];
+  try {
+    const parsedUrl = new URL(url);
+    const hostname = parsedUrl.hostname.toLowerCase();
+    return supportedPlatforms.some(platform => hostname === platform || hostname.endsWith("." + platform));
+  } catch (e) {
+    return false;
+  }
 }
 
 function wireEvents() {
@@ -89,22 +127,54 @@ async function onAnalyze() {
   const sourceCode = els.sourceCode.value.trim();
   if (!sourceCode) {
     setStatus("Source code is required.", true);
+    clearResult();
     return;
   }
 
-  const payload = {
-    problemId: nullIfBlank(els.problemId.value),
-    problemStatement: nullIfBlank(els.problemStatement.value),
-    sourceCode,
-    className: nullIfBlank(els.className.value)
-  };
-
-  const url = buildAnalyzeUrl();
+  if (sourceCode.length < 20) {
+    setStatus("Code too short to analyze meaningfully.", true);
+    clearResult();
+    return;
+  }
 
   setStatus("Analyzing...");
   disableActions(true);
 
   try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+
+    if (tab?.id && isAnalyzableUrl(tab.url || "")) {
+      const response = await chrome.runtime.sendMessage({
+        type: "codeat:get-analysis",
+        tabId: tab.id,
+        force: true
+      });
+
+      if (response && response.status === "ok" && response.result) {
+        renderResult(response.result);
+        setStatus("Analysis complete.");
+        return;
+      }
+
+      if (response && response.status === "no_code") {
+        setStatus("No sufficient code detected in the editor.", true);
+        clearResult();
+        return;
+      }
+
+      if (response && response.status === "error") {
+        throw new Error(response.error || "Analysis failed");
+      }
+    }
+
+    const payload = {
+      problemId: nullIfBlank(els.problemId.value),
+      problemStatement: nullIfBlank(els.problemStatement.value),
+      sourceCode,
+      className: nullIfBlank(els.className.value)
+    };
+
+    const url = buildAnalyzeUrl();
     const response = await fetch(url, {
       method: "POST",
       headers: {
@@ -125,6 +195,7 @@ async function onAnalyze() {
     setStatus("Analysis complete.");
   } catch (err) {
     setStatus(err.message || "Analyze failed.", true);
+    clearResult();
   } finally {
     disableActions(false);
   }
@@ -166,20 +237,35 @@ async function extractContextFromActiveTab() {
 
       const pickLongest = (values) => values.filter(Boolean).sort((a, b) => b.length - a.length)[0] || "";
 
+      const isLikelyJavaCode = (text) => {
+        if (!text || text.length < 20) return false;
+        const hasClass = /\bclass\s+\w+/.test(text);
+        const hasMethod = /\b(public|private|protected|static)\s+\w+\s+\w+\s*\(/.test(text);
+        const hasBraces = text.includes("{") && text.includes("}");
+        return hasClass || (hasMethod && hasBraces);
+      };
+
       const fromTextarea = pickLongest(
-        Array.from(document.querySelectorAll("textarea")).map((el) => el.value || "")
+        Array.from(document.querySelectorAll("textarea")).map((el) => el.value || "").filter(isLikelyJavaCode)
       );
 
       const fromMonaco = pickLongest(
-        Array.from(document.querySelectorAll(".view-lines, .monaco-editor .lines-content")).map((el) => el.innerText || "")
+        Array.from(document.querySelectorAll(".view-lines, .monaco-editor .lines-content")).map((el) => el.innerText || "").filter(isLikelyJavaCode)
       );
 
-      const fromCodeBlocks = pickLongest(
-        Array.from(document.querySelectorAll("pre, code, .cm-content")).map((el) => el.innerText || "")
+      const fromCodeMirror = pickLongest(
+        Array.from(document.querySelectorAll(".cm-content, .CodeMirror-code")).map((el) => el.innerText || "").filter(isLikelyJavaCode)
       );
 
-      const sourceCandidate = pickLongest([fromTextarea, fromMonaco, fromCodeBlocks]).trim();
-      const sourceCode = cleanup(sourceCandidate);
+      const sourceCandidate = pickLongest([
+        fromTextarea,
+        fromMonaco,
+        fromCodeMirror
+      ].filter(Boolean)).trim();
+
+      const sourceCode = sourceCandidate ? cleanup(sourceCandidate) : pickLongest(
+        Array.from(document.querySelectorAll("textarea")).map((el) => el.value || "")
+      );
 
       const classMatch = sourceCode.match(/\bclass\s+([A-Za-z_][A-Za-z0-9_]*)/);
       const className = classMatch ? classMatch[1] : "";
@@ -252,6 +338,19 @@ function renderResult(data) {
   els.resultCard.classList.remove("hidden");
 }
 
+function clearResult() {
+  els.resultCard.classList.add("hidden");
+  els.accuracyValue.textContent = "N/A";
+  els.confidenceValue.textContent = "N/A";
+  els.verdictPill.textContent = "-";
+  els.matchedProblem.textContent = "Unknown";
+  els.compileLikely.textContent = "N/A";
+  els.feedbackText.textContent = "No analysis available.";
+  renderList(els.strengthList, [], "No strengths provided.");
+  renderList(els.improvementList, [], "No improvements provided.");
+  renderList(els.scenarioList, [], "No likely failing scenarios.");
+}
+
 function renderList(container, items, fallback) {
   container.innerHTML = "";
   const values = items.filter(Boolean);
@@ -321,4 +420,9 @@ function disableActions(disabled) {
 function setStatus(message, isError = false) {
   els.status.textContent = message;
   els.status.classList.toggle("error", Boolean(isError));
+}
+
+function fingerprintCode(sourceCode) {
+  const normalized = (sourceCode || "").replace(/\s+/g, " ").trim();
+  return `${normalized.length}:${normalized.slice(0, 120)}`;
 }

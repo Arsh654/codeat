@@ -64,30 +64,8 @@ async function init() {
   }
 
   populateForm(extracted);
-
-  try {
-    const response = await chrome.runtime.sendMessage({
-      type: "codeat:get-analysis",
-      tabId: tab.id,
-      force: false
-    });
-
-    if (response && response.status === "ok" && response.result && response.extracted) {
-      const currentFingerprint = fingerprintCode(extracted.sourceCode);
-      const cachedFingerprint = fingerprintCode(response.extracted.sourceCode);
-
-      if (currentFingerprint === cachedFingerprint) {
-        renderResult(response.result);
-        setStatus("Showing cached analysis.");
-        return;
-      }
-    }
-  } catch (err) {
-    console.warn("Failed to get cached analysis, will run fresh analysis:", err);
-  }
-
-  setStatus("Code detected. Running analysis...");
-  await onAnalyze();
+  setStatus("Code detected. Click 'Analyze' to start analysis.");
+  clearResult();
 }
 
 function isAnalyzableUrl(url) {

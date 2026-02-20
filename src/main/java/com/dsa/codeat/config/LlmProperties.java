@@ -78,16 +78,17 @@ public class LlmProperties {
             case "groq" -> "https://api.groq.com/openai/v1/chat/completions";
             case "openai", "" -> "https://api.openai.com/v1/chat/completions";
             case "openrouter" -> "https://openrouter.ai/api/v1/chat/completions";
+            case "cerebras" -> "https://api.cerebras.ai/v1/chat/completions";
             default -> throw new IllegalArgumentException("Unsupported llm.provider: " + providerName);
         };
     }
 
     public static class Fallback {
         private boolean enabled = false;
-        private String provider = "openrouter";
+        private String provider = "cerebras";
         private String apiUrl;
         private String apiKey;
-        private String model = "meta-llama/llama-3.2-3b-instruct";
+        private String model = "llama-3.3-70b";
 
         public boolean isEnabled() {
             return enabled;

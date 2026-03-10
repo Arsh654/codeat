@@ -15,6 +15,10 @@ public record LlmScoreResult(
         List<String> strengths,
         List<String> improvements,
         List<FailingScenarioResult> failingScenarios,
+        String reviewSummary,
+        Double styleScorePercentage,
+        List<String> styleFindings,
+        List<String> reviewSuggestions,
         String modelUsed
 ) {
 }

@@ -36,15 +36,20 @@ class CodeEvaluationServiceTest {
                         "Return indices [0,1] (order may vary).",
                         "May reuse the same index or miss valid pair due to index lookup logic.",
                         "Index recovery after sorting can mis-handle duplicates."
-                ))
+                )),
+                "Clean separation of search and index-mapping logic.",
+                82.5,
+                List.of("Method naming is clear but could be more domain-specific."),
+                List.of("Extract index reconstruction into a helper for readability."),
+                "test-model"
         );
 
-        CodeEvaluationService codeEvaluationService = CodeEvaluationService.forTesting(llmScoringClient, "test-model");
+        CodeEvaluationService codeEvaluationService = CodeEvaluationService.forTesting(llmScoringClient);
 
         AnalyzeResponse response = codeEvaluationService.analyze(new AnalyzeRequest(
                 null,
                 null,
-                "public class Main { public static void main(String[] args) {} }",
+                "public class Main { public int solve(int[] nums) { int sum = 0; for (int n : nums) { sum += n; } return sum; } }",
                 "Main"
         ));
 
@@ -54,6 +59,8 @@ class CodeEvaluationServiceTest {
         assertThat(response.estimatedPassedTestCases()).isEqualTo(17);
         assertThat(response.estimatedTotalTestCases()).isEqualTo(35);
         assertThat(response.modelUsed()).isEqualTo("test-model");
+        assertThat(response.reviewSummary()).contains("separation");
+        assertThat(response.styleScorePercentage()).isEqualTo(82.5);
         assertThat(response.strengths()).hasSize(2);
         assertThat(response.failingScenarios()).isNotEmpty();
         assertThat(response.failingScenarios().get(0).inputExample()).contains("nums=[3,3]");
@@ -64,13 +71,13 @@ class CodeEvaluationServiceTest {
         LlmScoringClient llmScoringClient = request -> {
             throw new IllegalStateException("LLM client is not configured.");
         };
-        CodeEvaluationService codeEvaluationService = CodeEvaluationService.forTesting(llmScoringClient, "test-model");
+        CodeEvaluationService codeEvaluationService = CodeEvaluationService.forTesting(llmScoringClient);
 
         try {
             codeEvaluationService.analyze(new AnalyzeRequest(
                     null,
                     null,
-                    "public class Main {}",
+                    "public class Main { public int solve(int[] nums) { int x = 0; for (int n : nums) { x ^= n; } return x; } }",
                     "Main"
             ));
         } catch (IllegalStateException ex) {

@@ -59,6 +59,10 @@ public class CodeEvaluationService {
                                 s.reason()
                         ))
                         .toList(),
+                emptyToNull(result.reviewSummary()),
+                result.styleScorePercentage(),
+                result.styleFindings(),
+                result.reviewSuggestions(),
                 result.modelUsed()
         );
 

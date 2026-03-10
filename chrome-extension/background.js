@@ -4,43 +4,10 @@ const DEFAULT_SETTINGS = {
 };
 
 const tabCache = new Map();
-const pendingAnalysis = new Map();
-const DEBOUNCE_DELAY = 5000; // 5 second debounce to reduce API calls
 
 chrome.runtime.onInstalled.addListener(() => {
   chrome.action.setBadgeBackgroundColor({ color: "#0b3f8a" });
 });
-
-chrome.tabs.onActivated.addListener(async ({ tabId }) => {
-  debouncedAnalyze(tabId, false);
-});
-
-chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
-  if (changeInfo.status !== "complete") {
-    return;
-  }
-  if (!tab.active) {
-    return;
-  }
-  debouncedAnalyze(tabId, false);
-});
-
-function debouncedAnalyze(tabId, force) {
-  if (pendingAnalysis.has(tabId)) {
-    clearTimeout(pendingAnalysis.get(tabId));
-  }
-
-  const timeoutId = setTimeout(async () => {
-    pendingAnalysis.delete(tabId);
-    try {
-      await analyzeTabAndUpdateBadge(tabId, force);
-    } catch (err) {
-      console.warn("Failed to analyze tab:", err);
-    }
-  }, DEBOUNCE_DELAY);
-
-  pendingAnalysis.set(tabId, timeoutId);
-}
 
 chrome.tabs.onRemoved.addListener((tabId) => {
   tabCache.delete(tabId);

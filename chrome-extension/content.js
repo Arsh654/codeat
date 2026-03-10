@@ -1,5 +1,4 @@
 const ROOT_ID = "codeat-floating-root";
-const POLL_MS = 12000;
 
 let rootEl;
 let bodyEl;
@@ -7,19 +6,16 @@ let statusEl;
 let analyzeAgainBtn;
 let pending = false;
 let collapsed = false;
+let suppressNextToggle = false;
+
+const DRAG_THRESHOLD_PX = 5;
 
 init();
 
 function init() {
   ensureWidget();
-  refresh(true);
-  setInterval(() => refresh(false), POLL_MS);
-
-  document.addEventListener("visibilitychange", () => {
-    if (!document.hidden) {
-      refresh(false);
-    }
-  });
+  showWidget();
+  setStatus("Click Analyze to run.");
 }
 
 function ensureWidget() {
@@ -31,101 +27,128 @@ function ensureWidget() {
   style.textContent = `
     #${ROOT_ID} {
       position: fixed;
-      top: 96px;
-      right: 20px;
+      bottom: 16px;
+      right: 16px;
       z-index: 2147483647;
-      width: 280px;
-      font-family: "Segoe UI", Tahoma, sans-serif;
-      color: #0f172a;
+      width: min(312px, calc(100vw - 24px));
+      font-family: "Plus Jakarta Sans", "Manrope", "Avenir Next", "Segoe UI", sans-serif;
+      color: #1f2f25;
     }
     #${ROOT_ID}.hidden { display: none; }
     #${ROOT_ID} .panel {
-      border: 1px solid #cbd5e1;
-      border-radius: 12px;
+      border: 1px solid #d6e0d2;
+      border-radius: 16px;
       overflow: hidden;
-      background: linear-gradient(165deg, #ffffff 0%, #f8fafc 100%);
-      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.16);
+      backdrop-filter: blur(9px);
+      background:
+        radial-gradient(120% 110% at 100% 0%, rgba(245, 233, 206, 0.42) 0%, transparent 55%),
+        linear-gradient(155deg, rgba(251, 254, 250, 0.92) 0%, rgba(243, 249, 241, 0.92) 100%);
+      box-shadow: 0 14px 30px rgba(39, 62, 48, 0.2);
     }
     #${ROOT_ID} .head {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 10px 12px;
-      background: #0b3f8a;
-      color: #fff;
+      padding: 11px 12px;
+      background: linear-gradient(160deg, #2f6f57 0%, #255946 100%);
+      color: #f7fff9;
       font-weight: 600;
       font-size: 13px;
       cursor: pointer;
+      letter-spacing: 0.01em;
     }
     #${ROOT_ID} .head-right {
       display: flex;
       gap: 8px;
       align-items: center;
-      font-size: 11px;
-      opacity: 0.95;
+      font-size: 10px;
+      opacity: 0.96;
     }
     #${ROOT_ID} .pill {
-      padding: 2px 7px;
+      padding: 2px 8px;
       border-radius: 999px;
-      background: rgba(255, 255, 255, 0.2);
-      border: 1px solid rgba(255, 255, 255, 0.35);
+      background: rgba(255, 255, 255, 0.26);
+      border: 1px solid rgba(255, 255, 255, 0.4);
+      font-weight: 700;
+      letter-spacing: 0.05em;
     }
     #${ROOT_ID} .body {
-      padding: 10px 12px;
+      padding: 11px 12px;
       display: grid;
-      gap: 8px;
+      gap: 10px;
     }
     #${ROOT_ID} .metric-row {
       display: flex;
-      gap: 8px;
+      gap: 10px;
     }
     #${ROOT_ID} .metric {
       flex: 1;
-      border: 1px solid #dbe3ef;
-      border-radius: 10px;
-      padding: 8px;
-      background: #fff;
+      border: 1px solid #dbe4d8;
+      border-radius: 12px;
+      padding: 9px;
+      background: rgba(255, 255, 255, 0.86);
     }
     #${ROOT_ID} .metric .label {
-      font-size: 11px;
-      color: #475569;
-      margin-bottom: 4px;
+      font-size: 10px;
+      color: #5b6f61;
+      margin-bottom: 5px;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      font-weight: 600;
     }
     #${ROOT_ID} .metric .value {
-      font-size: 18px;
+      font-size: 20px;
       font-weight: 700;
-      color: #0f172a;
+      color: #1f2f25;
       line-height: 1;
+      letter-spacing: -0.02em;
     }
     #${ROOT_ID} .line {
       font-size: 12px;
-      line-height: 1.35;
-      color: #1e293b;
+      line-height: 1.45;
+      color: #2f4235;
+      background: rgba(255, 255, 255, 0.62);
+      border: 1px solid #deeadb;
+      border-radius: 10px;
+      padding: 8px;
     }
     #${ROOT_ID} .status {
       font-size: 11px;
-      color: #64748b;
+      color: #5f7364;
     }
     #${ROOT_ID} .actions {
       display: flex;
       justify-content: flex-end;
     }
     #${ROOT_ID} .analyze-btn {
-      border: 1px solid #bfdbfe;
-      background: #eff6ff;
-      color: #1e3a8a;
-      border-radius: 8px;
+      border: 1px solid #a6c5b5;
+      background: linear-gradient(170deg, #3a7d62 0%, #2c634d 100%);
+      color: #f5fff8;
+      border-radius: 10px;
       font-size: 11px;
       font-weight: 600;
-      padding: 5px 8px;
+      padding: 7px 10px;
       cursor: pointer;
+      box-shadow: 0 8px 14px rgba(44, 99, 77, 0.24);
+      transition: transform 0.15s ease, box-shadow 0.18s ease;
+    }
+    #${ROOT_ID} .analyze-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 11px 16px rgba(44, 99, 77, 0.28);
     }
     #${ROOT_ID} .analyze-btn:disabled {
       opacity: 0.65;
       cursor: not-allowed;
     }
     #${ROOT_ID} .error {
-      color: #b91c1c;
+      color: #b6413e;
+    }
+    @media (max-width: 768px) {
+      #${ROOT_ID} {
+        right: 8px;
+        bottom: 8px;
+        width: min(300px, calc(100vw - 16px));
+      }
     }
   `;
   document.documentElement.appendChild(style);
@@ -147,10 +170,9 @@ function ensureWidget() {
           <div class="metric"><div class="label">Correctness</div><div class="value" id="codeat-accuracy">--</div></div>
           <div class="metric"><div class="label">Confidence</div><div class="value" id="codeat-confidence">--</div></div>
         </div>
-        <div class="line" id="codeat-problem">Problem: -</div>
         <div class="line" id="codeat-feedback">Feedback: Waiting for analysis...</div>
-        <div class="actions"><button id="codeat-analyze-again" class="analyze-btn" type="button">Analyze Again</button></div>
-        <div class="status" id="codeat-status">Initializing...</div>
+        <div class="actions"><button id="codeat-analyze-again" class="analyze-btn" type="button">Analyze</button></div>
+        <div class="status" id="codeat-status">Click Analyze to run.</div>
       </div>
     </div>
   `;
@@ -161,7 +183,14 @@ function ensureWidget() {
   statusEl = rootEl.querySelector("#codeat-status");
   analyzeAgainBtn = rootEl.querySelector("#codeat-analyze-again");
 
-  rootEl.querySelector("#codeat-head").addEventListener("click", () => {
+  const headEl = rootEl.querySelector("#codeat-head");
+  setupDrag(headEl);
+
+  headEl.addEventListener("click", () => {
+    if (suppressNextToggle) {
+      suppressNextToggle = false;
+      return;
+    }
     collapsed = !collapsed;
     bodyEl.style.display = collapsed ? "none" : "grid";
     rootEl.querySelector("#codeat-toggle").textContent = collapsed ? "Show" : "Hide";
@@ -171,6 +200,68 @@ function ensureWidget() {
     event.stopPropagation();
     await refresh(true);
   });
+}
+
+function setupDrag(handleEl) {
+  let dragging = false;
+  let moved = false;
+  let pointerId = null;
+  let pointerOffsetX = 0;
+  let pointerOffsetY = 0;
+
+  handleEl.addEventListener("pointerdown", (event) => {
+    if (event.button !== 0) {
+      return;
+    }
+
+    const rect = rootEl.getBoundingClientRect();
+    pointerId = event.pointerId;
+    pointerOffsetX = event.clientX - rect.left;
+    pointerOffsetY = event.clientY - rect.top;
+    dragging = true;
+    moved = false;
+    handleEl.setPointerCapture(pointerId);
+  });
+
+  handleEl.addEventListener("pointermove", (event) => {
+    if (!dragging || event.pointerId !== pointerId) {
+      return;
+    }
+
+    const rect = rootEl.getBoundingClientRect();
+    const nextLeft = event.clientX - pointerOffsetX;
+    const nextTop = event.clientY - pointerOffsetY;
+
+    const deltaX = Math.abs(nextLeft - rect.left);
+    const deltaY = Math.abs(nextTop - rect.top);
+    if (!moved && deltaX < DRAG_THRESHOLD_PX && deltaY < DRAG_THRESHOLD_PX) {
+      return;
+    }
+
+    moved = true;
+    rootEl.style.right = "auto";
+    rootEl.style.bottom = "auto";
+
+    const maxLeft = Math.max(0, window.innerWidth - rect.width);
+    const maxTop = Math.max(0, window.innerHeight - rect.height);
+    rootEl.style.left = `${clamp(nextLeft, 0, maxLeft)}px`;
+    rootEl.style.top = `${clamp(nextTop, 0, maxTop)}px`;
+  });
+
+  const endDrag = (event) => {
+    if (!dragging || event.pointerId !== pointerId) {
+      return;
+    }
+    dragging = false;
+    if (moved) {
+      suppressNextToggle = true;
+    }
+    handleEl.releasePointerCapture(pointerId);
+    pointerId = null;
+  };
+
+  handleEl.addEventListener("pointerup", endDrag);
+  handleEl.addEventListener("pointercancel", endDrag);
 }
 
 async function refresh(force) {
@@ -189,8 +280,15 @@ async function refresh(force) {
       force
     });
 
-    if (!response || response.status === "unsupported" || response.status === "no_code") {
-      hideWidget();
+    if (!response || response.status === "unsupported") {
+      showWidget();
+      setStatus("Page not supported for analysis.", true);
+      return;
+    }
+
+    if (response.status === "no_code") {
+      showWidget();
+      setStatus("No sufficient code detected.", true);
       return;
     }
 
@@ -205,8 +303,7 @@ async function refresh(force) {
       renderResult(response.result, response.updatedAt);
       return;
     }
-
-    hideWidget();
+    setStatus("No analysis response.", true);
   } catch (err) {
     showWidget();
     setStatus(err.message || "Failed to refresh", true);
@@ -222,7 +319,6 @@ function renderResult(result, updatedAt) {
   const accuracyEl = rootEl.querySelector("#codeat-accuracy");
   const confidenceEl = rootEl.querySelector("#codeat-confidence");
   const verdictEl = rootEl.querySelector("#codeat-verdict");
-  const problemEl = rootEl.querySelector("#codeat-problem");
   const feedbackEl = rootEl.querySelector("#codeat-feedback");
 
   const verdict = (result.leetcodeLikelyVerdict || "N/A").toUpperCase();
@@ -232,7 +328,6 @@ function renderResult(result, updatedAt) {
   accuracyEl.textContent = accuracyText;
   confidenceEl.textContent = confidenceText;
   verdictEl.textContent = verdict;
-  problemEl.textContent = `Problem: ${result.matchedProblemTitle || result.matchedProblemId || "Unknown"}`;
   feedbackEl.textContent = `Feedback: ${truncate(result.feedback || "No feedback returned.", 140)}`;
 
   verdictEl.style.background = verdictColor(verdict);
@@ -240,10 +335,10 @@ function renderResult(result, updatedAt) {
 }
 
 function verdictColor(verdict) {
-  if (verdict === "PASS") return "rgba(22, 163, 74, 0.35)";
-  if (verdict === "MAY_PASS") return "rgba(234, 88, 12, 0.35)";
-  if (verdict === "FAIL") return "rgba(220, 38, 38, 0.35)";
-  return "rgba(59, 130, 246, 0.35)";
+  if (verdict === "PASS") return "rgba(22, 163, 74, 0.45)";
+  if (verdict === "MAY_PASS") return "rgba(217, 119, 6, 0.45)";
+  if (verdict === "FAIL") return "rgba(220, 38, 38, 0.45)";
+  return "rgba(30, 136, 120, 0.4)";
 }
 
 function setStatus(message, isError = false) {
@@ -257,6 +352,10 @@ function showWidget() {
 
 function hideWidget() {
   rootEl.classList.add("hidden");
+}
+
+function clamp(value, min, max) {
+  return Math.min(max, Math.max(min, value));
 }
 
 function truncate(value, max) {

@@ -1,10 +1,11 @@
-# Codeat API (Java DSA LLM Evaluator)
+# Codeat API (Multi-language DSA LLM Evaluator)
 
-API service to evaluate Java DSA submissions using an LLM and return:
+API service to evaluate DSA submissions across multiple languages (C++, Java, Python, JavaScript, Go, C#, and similar) using an LLM and return:
 - matched problem guess
 - accuracy and confidence percentages
 - LeetCode-likely verdict (`PASS`, `MAY_PASS`, `FAIL`, `UNCERTAIN`)
 - structured failing scenarios (when applicable)
+- conditional code review + style analysis for predicted `100% PASS` solutions
 
 ## Tech Stack
 - Java 17
@@ -199,16 +200,15 @@ export LLM_REQUEST_DELAY_MS=1000
 
 ### Tips to Avoid Rate Limits
 
-1. **Use the cache** - Extension caches results when code doesn't change
-2. **Don't spam "Analyze Again"** - Wait a few seconds between analyses
-3. **Increase backend delay** - Set `LLM_REQUEST_DELAY_MS=3000` or higher
-4. **Auto-analysis waits 5 seconds** - Extension debounces automatic tab analysis
-5. **Use one provider** - Disable fallback to simplify: `LLM_FALLBACK_ENABLED=false`
+1. **Don't spam Analyze** - Wait a few seconds between analyses
+2. **Increase backend delay** - Set `LLM_REQUEST_DELAY_MS=3000` or higher
+3. **Use one provider** - Disable fallback to simplify: `LLM_FALLBACK_ENABLED=false`
+4. **Prefer stable models** - Reduce retries caused by malformed/empty outputs
 
 **For Groq Free Tier Limits:**
 - 30 requests/minute for llama-3.3-70b-versatile
 - With 3 second delay, you'll do ~20 requests/minute = safe ✅
-- Each analysis = 2-3 API calls = ~8 analyses/minute max
+- Some analyses may use a second LLM call for `100% PASS` review/style output
 
 ## API Endpoints
 
@@ -226,11 +226,12 @@ Request body:
   "problemId": "1",
   "problemStatement": "optional",
   "className": "Solution",
-  "sourceCode": "class Solution { ... }"
+  "sourceCode": "int maxArea(vector<int>& height) { ... }"
 }
 ```
 
 `problemId`, `problemStatement`, and `className` are optional hints.
+`className` is mainly useful for class-based languages (for example Java/C#).
 `sourceCode` is required.
 
 Response shape:
@@ -255,9 +256,15 @@ Response shape:
       "reason": "..."
     }
   ],
+  "reviewSummary": "Maintainable structure with clear control flow.",
+  "styleScorePercentage": 88.5,
+  "styleFindings": ["Method naming is mostly consistent."],
+  "reviewSuggestions": ["Extract duplicate branch logic into a helper."],
   "modelUsed": "llama-3.3-70b-versatile"
 }
 ```
+
+`reviewSummary`, `styleScorePercentage`, `styleFindings`, and `reviewSuggestions` are optional and are populated only for predicted `100% PASS` solutions.
 
 ## Verdict Meaning
 - `PASS`: strong evidence code should pass hidden tests.
@@ -267,6 +274,7 @@ Response shape:
 
 ## Notes on Scoring
 - The service is LLM-first (no deterministic code execution engine in this MVP).
+- The analyzer detects language from submitted code and aligns feedback to that language.
 - A normalization layer is applied to reduce contradictory LLM outputs.
 - Structured failing scenarios are filtered for low-quality/hallucinated entries.
 
@@ -297,20 +305,22 @@ A Chrome extension scaffold is available in `chrome-extension/`.
 ### Use
 
 1. Open a coding page with visible source code.
-2. The extension shows an in-page floating widget with correctness, confidence, verdict, and feedback.
-3. Open the extension popup for curated insights (strengths, improvements, likely failing scenarios).
-4. You can still click `Extract From Tab` or `Analyze` manually if needed.
+2. Click `Analyze` in the popup or in-page widget to run analysis (manual trigger only).
+3. Use `Extract From Tab` to auto-fill code/context before analyzing.
+4. Review results in popup (accuracy, confidence, verdict, strengths, improvements, likely failing scenarios).
+5. For predicted `100% PASS`, popup also shows `Code Review & Style`.
+6. The in-page widget is draggable and can be collapsed.
 
 The extension sends a request to your backend and displays relevant result signals in both the page widget and popup.
 
-### Auto Badge Behavior
+### Analysis Trigger Behavior
 
-- Without opening the popup, the extension analyzes detected code on the active tab.
-- The extension icon badge shows estimated correctness percentage (e.g. `92%`).
-- Badge color maps to verdict:
-  - Green: `PASS`
-  - Orange: `MAY_PASS`
-  - Red: `FAIL`
+- No automatic analysis on tab switch/page load.
+- Analysis runs only when user explicitly clicks `Analyze` / `Analyze Again`.
+- This avoids noisy background calls and gives users full control.
+
+## Open Source and Maintenance
+This section would be added in sometime.
 
 ## Current Limitations
 - LLM-based evaluation can still be noisy for edge cases.

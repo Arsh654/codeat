@@ -11,7 +11,7 @@ llm:
   provider: ${LLM_PROVIDER:openai}
   api-url: ${LLM_API_URL:}
   api-key: ${LLM_API_KEY:${GROQ_API_KEY:${CEREBRAS_API_KEY:}}}
-  model: ${LLM_MODEL:gpt-4o-mini}
+  model: ${LLM_MODEL:}
 
   # Rate limiting: delay in milliseconds between API requests (prevents rate limits)
   request-delay-ms: ${LLM_REQUEST_DELAY_MS:3000}

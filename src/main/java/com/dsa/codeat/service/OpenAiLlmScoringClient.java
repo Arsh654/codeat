@@ -55,6 +55,10 @@ public class OpenAiLlmScoringClient implements LlmScoringClient {
             List<String> strengths = toStringList(result.path("strengths"));
             List<String> improvements = toStringList(result.path("improvements"));
             List<FailingScenarioResult> failingScenarios = sanitizeFailingScenarios(toFailingScenarioList(result.path("failingScenarios")));
+            String reviewSummary = "";
+            Double styleScorePercentage = null;
+            List<String> styleFindings = List.of();
+            List<String> reviewSuggestions = List.of();
             failingScenarios = applyProblemSpecificScenarioFilters(matchedProblemId, matchedProblemTitle, failingScenarios);
 
             if (shouldBackfillScenarios(verdict, accuracy, estimatedPassed, estimatedTotal, compileLikelyValid, failingScenarios)) {
@@ -127,6 +131,21 @@ public class OpenAiLlmScoringClient implements LlmScoringClient {
             accuracy = strictScore.accuracy();
             confidence = strictScore.confidence();
 
+            if ("PASS".equals(verdict) && accuracy >= 100.0 && compileLikelyValid) {
+                try {
+                    CodeReviewResult codeReviewResult = requestCodeReviewForPassingSolution(request, feedback);
+                    reviewSummary = codeReviewResult.reviewSummary();
+                    styleScorePercentage = codeReviewResult.styleScorePercentage();
+                    styleFindings = codeReviewResult.styleFindings();
+                    reviewSuggestions = codeReviewResult.reviewSuggestions();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    log.warn("Code review generation interrupted for PASS solution");
+                } catch (IOException | IllegalStateException e) {
+                    log.warn("Could not generate PASS code review: {}", e.getMessage());
+                }
+            }
+
             String actualModelUsed = usedFallback
                 ? llmProperties.getFallback().getModel()
                 : llmProperties.getModel();
@@ -144,6 +163,10 @@ public class OpenAiLlmScoringClient implements LlmScoringClient {
                     strengths,
                     improvements,
                     failingScenarios,
+                    reviewSummary,
+                    styleScorePercentage,
+                    styleFindings,
+                    reviewSuggestions,
                     actualModelUsed
             );
             String providerUsed = usedFallback
@@ -285,6 +308,25 @@ public class OpenAiLlmScoringClient implements LlmScoringClient {
         boolean hasLikelyFailingCase = node.path("hasLikelyFailingCase").asBoolean(false);
         List<FailingScenarioResult> scenarios = toFailingScenarioList(node.path("failingScenarios"));
         return new PassChallengeResult(hasLikelyFailingCase || !scenarios.isEmpty(), scenarios);
+    }
+
+    private CodeReviewResult requestCodeReviewForPassingSolution(AnalyzeRequest request, String feedback)
+            throws IOException, InterruptedException {
+        String system = "You are a Java code reviewer. Return ONLY valid JSON with keys: " +
+                "reviewSummary (string), styleScorePercentage (number 0-100), styleFindings (array of strings), " +
+                "reviewSuggestions (array of strings). Keep feedback concise and practical.";
+
+        String user = "This code is predicted to pass with 100% confidence checks. " +
+                "Provide maintainability and style review only (not correctness).\\n" +
+                "Current analyzer feedback: " + safe(feedback) + "\\n" +
+                "Code:\\n" + request.sourceCode();
+
+        JsonNode node = requestCompletionAsJson(system, user);
+        String summary = text(node, "reviewSummary");
+        Double styleScore = nullablePercent(node.path("styleScorePercentage"));
+        List<String> findings = toStringList(node.path("styleFindings")).stream().limit(4).toList();
+        List<String> suggestions = toStringList(node.path("reviewSuggestions")).stream().limit(4).toList();
+        return new CodeReviewResult(summary, styleScore, findings, suggestions);
     }
 
     private String systemPrompt() {
@@ -663,6 +705,16 @@ public class OpenAiLlmScoringClient implements LlmScoringClient {
         return Math.round(clamped * 100.0) / 100.0;
     }
 
+    private Double nullablePercent(JsonNode node) {
+        if (node == null || node.isMissingNode() || node.isNull()) {
+            return null;
+        }
+        if (!node.isNumber()) {
+            return null;
+        }
+        return clampPercent(node.asDouble());
+    }
+
     private int clampCount(int value) {
         return Math.max(0, value);
     }
@@ -727,6 +779,14 @@ public class OpenAiLlmScoringClient implements LlmScoringClient {
     private record PassChallengeResult(
             boolean hasLikelyFailingCase,
             List<FailingScenarioResult> failingScenarios
+    ) {
+    }
+
+    private record CodeReviewResult(
+            String reviewSummary,
+            Double styleScorePercentage,
+            List<String> styleFindings,
+            List<String> reviewSuggestions
     ) {
     }
 

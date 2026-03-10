@@ -4,9 +4,7 @@ const DEFAULT_SETTINGS = {
 };
 
 const els = {
-  problemId: document.getElementById("problemId"),
   className: document.getElementById("className"),
-  problemStatement: document.getElementById("problemStatement"),
   sourceCode: document.getElementById("sourceCode"),
   analyze: document.getElementById("analyze"),
   analyzeNow: document.getElementById("analyzeNow"),
@@ -18,15 +16,23 @@ const els = {
   accuracyValue: document.getElementById("accuracyValue"),
   confidenceValue: document.getElementById("confidenceValue"),
   verdictPill: document.getElementById("verdictPill"),
-  matchedProblem: document.getElementById("matchedProblem"),
   compileLikely: document.getElementById("compileLikely"),
   feedbackText: document.getElementById("feedbackText"),
   strengthList: document.getElementById("strengthList"),
   improvementList: document.getElementById("improvementList"),
-  scenarioList: document.getElementById("scenarioList")
+  scenarioList: document.getElementById("scenarioList"),
+  reviewSection: document.getElementById("reviewSection"),
+  reviewSummaryText: document.getElementById("reviewSummaryText"),
+  styleScoreValue: document.getElementById("styleScoreValue"),
+  styleFindingList: document.getElementById("styleFindingList"),
+  reviewSuggestionList: document.getElementById("reviewSuggestionList")
 };
 
 let settings = { ...DEFAULT_SETTINGS };
+let hiddenContext = {
+  problemId: "",
+  problemStatement: ""
+};
 
 init().catch((err) => {
   setStatus(`Init error: ${err.message}`, true);
@@ -111,12 +117,6 @@ async function onAnalyzeAgain() {
     if (extracted.className) {
       els.className.value = extracted.className;
     }
-    if (extracted.problemId) {
-      els.problemId.value = extracted.problemId;
-    }
-    if (extracted.problemStatement) {
-      els.problemStatement.value = extracted.problemStatement;
-    }
     await onAnalyze();
   } finally {
     disableActions(false);
@@ -168,8 +168,8 @@ async function onAnalyze() {
     }
 
     const payload = {
-      problemId: nullIfBlank(els.problemId.value),
-      problemStatement: nullIfBlank(els.problemStatement.value),
+      problemId: nullIfBlank(hiddenContext.problemId),
+      problemStatement: nullIfBlank(hiddenContext.problemStatement),
       sourceCode,
       className: nullIfBlank(els.className.value)
     };
@@ -297,17 +297,16 @@ async function extractContextFromActiveTab() {
 }
 
 function populateForm(extracted) {
+  hiddenContext = {
+    problemId: extracted.problemId || hiddenContext.problemId,
+    problemStatement: extracted.problemStatement || hiddenContext.problemStatement
+  };
+
   if (!els.sourceCode.value.trim() && extracted.sourceCode) {
     els.sourceCode.value = extracted.sourceCode;
   }
   if (!els.className.value.trim() && extracted.className) {
     els.className.value = extracted.className;
-  }
-  if (!els.problemId.value.trim() && extracted.problemId) {
-    els.problemId.value = extracted.problemId;
-  }
-  if (!els.problemStatement.value.trim() && extracted.problemStatement) {
-    els.problemStatement.value = extracted.problemStatement;
   }
 }
 
@@ -319,7 +318,6 @@ function renderResult(data) {
   els.verdictPill.textContent = verdict;
   styleVerdict(els.verdictPill, verdict);
 
-  els.matchedProblem.textContent = data.matchedProblemTitle || data.matchedProblemId || "Unknown";
   els.compileLikely.textContent = typeof data.compileLikelyValid === "boolean"
     ? (data.compileLikelyValid ? "Yes" : "No")
     : "N/A";
@@ -334,6 +332,7 @@ function renderResult(data) {
     return [reason, input].filter(Boolean).join(" ");
   });
   renderList(els.scenarioList, scenarios, "No likely failing scenarios.");
+  renderReviewSection(data);
 
   els.resultCard.classList.remove("hidden");
 }
@@ -343,12 +342,39 @@ function clearResult() {
   els.accuracyValue.textContent = "N/A";
   els.confidenceValue.textContent = "N/A";
   els.verdictPill.textContent = "-";
-  els.matchedProblem.textContent = "Unknown";
   els.compileLikely.textContent = "N/A";
   els.feedbackText.textContent = "No analysis available.";
   renderList(els.strengthList, [], "No strengths provided.");
   renderList(els.improvementList, [], "No improvements provided.");
   renderList(els.scenarioList, [], "No likely failing scenarios.");
+  clearReviewSection();
+}
+
+function renderReviewSection(data) {
+  const hasSummary = Boolean((data.reviewSummary || "").trim());
+  const hasStyleScore = typeof data.styleScorePercentage === "number";
+  const styleFindings = (data.styleFindings || []).filter(Boolean).slice(0, 4);
+  const reviewSuggestions = (data.reviewSuggestions || []).filter(Boolean).slice(0, 4);
+  const hasReview = hasSummary || hasStyleScore || styleFindings.length > 0 || reviewSuggestions.length > 0;
+
+  if (!hasReview) {
+    clearReviewSection();
+    return;
+  }
+
+  els.reviewSummaryText.textContent = hasSummary ? data.reviewSummary : "No review summary provided.";
+  els.styleScoreValue.textContent = hasStyleScore ? toPercent(data.styleScorePercentage) : "N/A";
+  renderList(els.styleFindingList, styleFindings, "No style findings.");
+  renderList(els.reviewSuggestionList, reviewSuggestions, "No review suggestions.");
+  els.reviewSection.classList.remove("hidden");
+}
+
+function clearReviewSection() {
+  els.reviewSection.classList.add("hidden");
+  els.reviewSummaryText.textContent = "No review summary provided.";
+  els.styleScoreValue.textContent = "N/A";
+  renderList(els.styleFindingList, [], "No style findings.");
+  renderList(els.reviewSuggestionList, [], "No review suggestions.");
 }
 
 function renderList(container, items, fallback) {
@@ -369,22 +395,22 @@ function renderList(container, items, fallback) {
 }
 
 function styleVerdict(el, verdict) {
-  let bg = "#dbeafe";
-  let fg = "#1d4ed8";
-  let border = "#93c5fd";
+  let bg = "#ddf0e9";
+  let fg = "#2d6b53";
+  let border = "#a7cfbc";
 
   if (verdict === "PASS") {
-    bg = "#dcfce7";
-    fg = "#166534";
-    border = "#86efac";
+    bg = "#d9f3e3";
+    fg = "#1f6a3d";
+    border = "#8dcfac";
   } else if (verdict === "MAY_PASS") {
-    bg = "#ffedd5";
-    fg = "#9a3412";
-    border = "#fdba74";
+    bg = "#fff1da";
+    fg = "#8d4f17";
+    border = "#f0c388";
   } else if (verdict === "FAIL") {
-    bg = "#fee2e2";
-    fg = "#991b1b";
-    border = "#fca5a5";
+    bg = "#ffe5e5";
+    fg = "#982727";
+    border = "#e7aaaa";
   }
 
   el.style.background = bg;

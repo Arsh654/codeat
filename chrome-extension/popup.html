@@ -17,14 +17,8 @@
     </header>
 
     <section class="card input-card">
-      <label for="problemId">Problem ID (optional)</label>
-      <input id="problemId" type="text" placeholder="e.g. two-sum">
-
       <label for="className">Class Name (optional)</label>
       <input id="className" type="text" placeholder="Solution">
-
-      <label for="problemStatement">Problem Statement (optional)</label>
-      <textarea id="problemStatement" rows="2" placeholder="Auto-filled when available"></textarea>
 
       <div class="actions-row">
         <button id="extractCode" type="button" class="secondary">Extract From Tab</button>
@@ -58,10 +52,6 @@
 
       <div class="key-grid">
         <div>
-          <p class="label">Matched Problem</p>
-          <p id="matchedProblem">--</p>
-        </div>
-        <div>
           <p class="label">Compile Likely Valid</p>
           <p id="compileLikely">--</p>
         </div>
@@ -80,6 +70,17 @@
       <div class="section">
         <p class="label">Improvements</p>
         <ul id="improvementList" class="list"></ul>
+      </div>
+
+      <div id="reviewSection" class="section hidden">
+        <p class="label">Code Review & Style</p>
+        <p id="reviewSummaryText" class="body-text">--</p>
+        <p class="label">Style Score</p>
+        <p id="styleScoreValue" class="metric small">--</p>
+        <p class="label">Style Findings</p>
+        <ul id="styleFindingList" class="list"></ul>
+        <p class="label">Review Suggestions</p>
+        <ul id="reviewSuggestionList" class="list"></ul>
       </div>
 
       <div class="section">

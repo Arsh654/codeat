@@ -294,12 +294,13 @@ public class OpenAiLlmScoringClient implements LlmScoringClient {
 
     private PassChallengeResult requestPassChallenge(AnalyzeRequest request, double accuracy, String feedback)
             throws IOException, InterruptedException {
+        String language = detectLanguage(request.sourceCode());
         String system = "You are a strict code judge. Return ONLY valid JSON with keys: " +
                 "hasLikelyFailingCase (boolean), failingScenarios (array of objects with keys " +
                 "inputExample, expectedBehavior, predictedBehavior, reason). " +
                 "If any realistic hidden test can fail, set hasLikelyFailingCase=true and provide at least one scenario.";
 
-        String user = "Review this code aggressively for hidden-test failures.\\n" +
+        String user = "Review this " + language + " code aggressively for hidden-test failures.\\n" +
                 "Current estimated accuracy: " + accuracy + "\\n" +
                 "Current feedback: " + safe(feedback) + "\\n" +
                 "Code:\\n" + request.sourceCode();
@@ -312,7 +313,8 @@ public class OpenAiLlmScoringClient implements LlmScoringClient {
 
     private CodeReviewResult requestCodeReviewForPassingSolution(AnalyzeRequest request, String feedback)
             throws IOException, InterruptedException {
-        String system = "You are a Java code reviewer. Return ONLY valid JSON with keys: " +
+        String language = detectLanguage(request.sourceCode());
+        String system = "You are a " + language + " code reviewer. Return ONLY valid JSON with keys: " +
                 "reviewSummary (string), styleScorePercentage (number 0-100), styleFindings (array of strings), " +
                 "reviewSuggestions (array of strings). Keep feedback concise and practical.";
 
@@ -330,16 +332,20 @@ public class OpenAiLlmScoringClient implements LlmScoringClient {
     }
 
     private String systemPrompt() {
-        return "You are an expert DSA Java evaluator. Return ONLY valid JSON with keys: " +
+        return "You are an expert DSA evaluator. Return ONLY valid JSON with keys: " +
                 "matchedProblemId, matchedProblemTitle, accuracyPercentage, confidencePercentage, " +
                 "leetcodeLikelyVerdict, estimatedPassedTestCases, estimatedTotalTestCases, " +
                 "compileLikelyValid, feedback, strengths, improvements, failingScenarios. " +
                 "leetcodeLikelyVerdict must be one of PASS, MAY_PASS, FAIL, UNCERTAIN. " +
+                "Detect the language from submitted code and only reference that language in feedback. " +
+                "Do not call code Java unless it is clearly Java. " +
+                "Keep feedback concise in 1 to 2 short sentences. " +
                 "If verdict is FAIL OR accuracyPercentage < 100, failingScenarios must be a non-empty array of " +
                 "objects with keys inputExample, expectedBehavior, predictedBehavior, reason.";
     }
 
     private String buildPrompt(AnalyzeRequest request) {
+        String language = detectLanguage(request.sourceCode());
         StringBuilder prompt = new StringBuilder();
         if (request.problemId() != null && !request.problemId().isBlank()) {
             prompt.append("Problem ID hint: ").append(request.problemId().trim()).append("\\n");
@@ -348,9 +354,10 @@ public class OpenAiLlmScoringClient implements LlmScoringClient {
             prompt.append("Problem statement hint: ").append(request.problemStatement().trim()).append("\\n");
         }
         if (request.className() != null && !request.className().isBlank()) {
-            prompt.append("Java class name hint: ").append(request.className().trim()).append("\\n");
+            prompt.append("Class name hint: ").append(request.className().trim()).append("\\n");
         }
-        prompt.append("Evaluate this Java DSA solution and estimate correctness percentage.\\n")
+        prompt.append("Detected language: ").append(language).append("\\n")
+                .append("Evaluate this ").append(language).append(" DSA solution and estimate correctness percentage.\\n")
                 .append("Also predict if it will pass LeetCode style hidden tests.\\n")
                 .append("If any risk exists, provide concrete failing scenarios.\\n")
                 .append("Code:\\n")
@@ -754,6 +761,38 @@ public class OpenAiLlmScoringClient implements LlmScoringClient {
             return "N/A";
         }
         return value.trim();
+    }
+
+    private String detectLanguage(String sourceCode) {
+        if (sourceCode == null || sourceCode.isBlank()) {
+            return "submitted language";
+        }
+        String code = sourceCode.trim();
+        String lower = code.toLowerCase();
+
+        if (lower.contains("#include") || lower.contains("std::") || lower.contains("using namespace std")
+                || lower.contains("vector<") || lower.contains("int main(")) {
+            return "C++";
+        }
+        if (lower.contains("import java.") || lower.contains("public class ") || lower.contains("system.out.")
+                || lower.contains("public static void main")) {
+            return "Java";
+        }
+        if (lower.contains("def ") || lower.contains("elif ") || lower.contains("print(")
+                || lower.contains("if __name__ == \"__main__\":")) {
+            return "Python";
+        }
+        if (lower.contains("function ") || lower.contains("console.log") || lower.contains("const ")
+                || lower.contains("let ")) {
+            return "JavaScript";
+        }
+        if (lower.contains("package main") || lower.contains("func ") || lower.contains("fmt.")) {
+            return "Go";
+        }
+        if (lower.contains("using system;") || lower.contains("namespace ") || lower.contains("console.writeline")) {
+            return "C#";
+        }
+        return "submitted language";
     }
 
     private void applyRateLimit() throws InterruptedException {

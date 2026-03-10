@@ -167,6 +167,17 @@ button:hover {
   margin-bottom: 10px;
 }
 
+.result-head > div {
+  background: linear-gradient(180deg, #f8fcf7 0%, #eef6ec 100%);
+  border: 1px solid #cfe0cc;
+  border-radius: 12px;
+  padding: 10px;
+}
+
+.result-head > div .label {
+  margin-top: 0;
+}
+
 .result-toolbar {
   display: flex;
   justify-content: flex-end;
@@ -206,12 +217,19 @@ button:hover {
   font-size: 12px;
 }
 
+.key-grid > div {
+  padding: 9px 10px;
+  border-radius: 10px;
+  border: 1px solid #d7e4d3;
+  background: #f8fcf7;
+}
+
 .section {
   margin-top: 11px;
   padding: 10px 11px;
   border-radius: 12px;
-  border: 1px solid #dde6db;
-  background: linear-gradient(180deg, #fbfdfb 0%, #f5f9f3 100%);
+  border: 1px solid #dfe9dc;
+  background: linear-gradient(180deg, #ffffff 0%, #f7fbf6 100%);
 }
 
 .body-text {
@@ -219,10 +237,8 @@ button:hover {
   font-size: 12px;
   line-height: 1.55;
   color: #2d3f32;
-  display: -webkit-box;
-  -webkit-line-clamp: 4;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .list {

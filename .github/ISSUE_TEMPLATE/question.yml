@@ -1,0 +1,21 @@
+name: Question
+description: Ask for clarification or usage help
+labels: ["type/question", "status/needs-triage"]
+body:
+  - type: textarea
+    id: question
+    attributes:
+      label: Question
+      description: Ask your question clearly and include context.
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: What are you trying to achieve?
+  - type: textarea
+    id: tried
+    attributes:
+      label: What You Tried
+      description: Commands, settings, or docs already checked.

@@ -1,0 +1,68 @@
+name: Bug report
+description: Report a reproducible defect in Codeat
+labels: ["type/bug", "status/needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug. Please provide clear steps so maintainers can reproduce quickly.
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: One-line description of the bug.
+      placeholder: The popup shows Java-specific feedback for C++ code.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      description: Exact steps, including code snippet and page/platform.
+      placeholder: |
+        1. Open LeetCode problem X
+        2. Paste code ...
+        3. Click Analyze
+        4. Observe ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behavior
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / Screenshots / Response Payload
+      description: Include API response, console logs, or screenshots if possible.
+  - type: input
+    id: version
+    attributes:
+      label: Project Version / Commit
+      placeholder: v0.4.0 or commit SHA
+  - type: dropdown
+    id: area
+    attributes:
+      label: Affected Area
+      options:
+        - Backend API
+        - Chrome Extension Popup
+        - In-page Widget
+        - Docs
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: env
+    attributes:
+      label: Environment
+      description: OS, browser version, Java version, provider/model.
+      placeholder: Ubuntu 24.04, Chrome 134, Java 17, Groq llama-3.3-70b-versatile

@@ -1,0 +1,9 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security report (private)
+    url: https://github.com/Arsh654/codeat/security/advisories/new
+    about: Please report security vulnerabilities privately.
+  - name: Support
+    url: https://github.com/Arsh654/codeat/issues
+    about: Use issues for support and troubleshooting questions.
+

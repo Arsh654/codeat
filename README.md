@@ -1,4 +1,4 @@
-# Codeat API (Multi-language DSA LLM Evaluator)
+# Codeat  (Multi-language DSA LLM Evaluator)
 
 API service to evaluate DSA submissions across multiple languages (C++, Java, Python, JavaScript, Go, C#, and similar) using an LLM and return:
 - matched problem guess
@@ -313,6 +313,16 @@ A Chrome extension scaffold is available in `chrome-extension/`.
 
 The extension sends a request to your backend and displays relevant result signals in both the page widget and popup.
 
+### Screenshots
+
+| Popup View | In-page Widget |
+|---|---|
+| ![Codeat Screenshot 1](assets/screenshots/screenshot-01.png) | ![Codeat Screenshot 2](assets/screenshots/screenshot-02.png) |
+
+| Full Result View |
+|---|
+| ![Codeat Screenshot 3](assets/screenshots/screenshot-03.png) |
+
 ### Analysis Trigger Behavior
 
 - No automatic analysis on tab switch/page load.
@@ -320,7 +330,25 @@ The extension sends a request to your backend and displays relevant result signa
 - This avoids noisy background calls and gives users full control.
 
 ## Open Source and Maintenance
-This section would be added in sometime.
+
+Recommended files when publishing this repo:
+- `LICENSE`
+- `CONTRIBUTING.md`
+- `CODE_OF_CONDUCT.md`
+- `SECURITY.md`
+- `SUPPORT.md`
+- `CHANGELOG.md`
+
+Detailed maintainer plan available in:
+- `Open_Source_Maintenance_Guide_Codeat.pdf`
+
+Maintainer/user contact information is provided in:
+- `SUPPORT.md`
+
+## License
+
+This project is licensed under the Apache License 2.0.
+See [`LICENSE`](LICENSE) for full terms.
 
 ## Current Limitations
 - LLM-based evaluation can still be noisy for edge cases.

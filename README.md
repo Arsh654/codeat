@@ -1,4 +1,4 @@
-# Codeat  (Multi-language DSA LLM Evaluator)
+cool# Codeat  (Multi-language DSA LLM Evaluator)
 
 API service to evaluate DSA submissions across multiple languages (C++, Java, Python, JavaScript, Go, C#, and similar) using an LLM and return:
 - matched problem guess
@@ -21,6 +21,12 @@ API service to evaluate DSA submissions across multiple languages (C++, Java, Py
 Service runs on port `3502` (see `src/main/resources/application.yml`).
 
 ## Environment Variables
+
+Start from the example file and create your local env config:
+
+```bash
+cp env.example env.txt
+```
 
 ```bash
 # Primary LLM Provider: openai | groq | openrouter | cerebras

@@ -26,7 +26,7 @@ Thanks for contributing to Codeat.
 
 ## Branch and Commit Style
 
-- Use a feature branch from `main`.
+- Use a feature branch from the default branch (`master`).
 - Prefer Conventional Commits:
   - `feat: ...`
   - `fix: ...`

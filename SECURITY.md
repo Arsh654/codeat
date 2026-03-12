@@ -2,7 +2,8 @@
 
 ## Supported Versions
 
-At minimum, the latest `main` branch is supported for security fixes.
+At minimum, the latest default branch (`master`) is supported for security fixes.
+If `main` is active in your deployment/release flow, it is also covered.
 
 ## Reporting a Vulnerability
 

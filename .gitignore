@@ -36,3 +36,7 @@ build/
 .env
 .env.*
 env.txt
+
+### Non-source artifacts ###
+*.pdf
+*.py

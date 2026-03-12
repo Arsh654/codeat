@@ -6,7 +6,7 @@ server:
   port: 3502
 
 llm:
-  # Primary LLM Configuration
+  # Primary LLM Configurations
   # Supported providers: openai | groq | openrouter | cerebras
   provider: ${LLM_PROVIDER:openai}
   api-url: ${LLM_API_URL:}

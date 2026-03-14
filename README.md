@@ -1,4 +1,4 @@
-cool# Codeat  (Multi-language DSA LLM Evaluator)
+## Codeat  (Multi-language DSA LLM Evaluator)
 
 API service to evaluate DSA submissions across multiple languages (C++, Java, Python, JavaScript, Go, C#, and similar) using an LLM and return:
 - matched problem guess

@@ -19,7 +19,13 @@ function init() {
 }
 
 function ensureWidget() {
-  if (document.getElementById(ROOT_ID)) {
+  const existingRoot = document.getElementById(ROOT_ID);
+  if (existingRoot) {
+    rootEl = existingRoot;
+    bodyEl = rootEl.querySelector("#codeat-body");
+    statusEl = rootEl.querySelector("#codeat-status");
+    analyzeAgainBtn = rootEl.querySelector("#codeat-analyze-again");
+    wireWidgetEvents();
     return;
   }
 
@@ -37,19 +43,19 @@ function ensureWidget() {
     #${ROOT_ID}.hidden { display: none; }
     #${ROOT_ID} .panel {
       border: 1px solid #d6e0d2;
-      border-radius: 16px;
+      border-radius: 18px;
       overflow: hidden;
       backdrop-filter: blur(9px);
       background:
         radial-gradient(120% 110% at 100% 0%, rgba(245, 233, 206, 0.42) 0%, transparent 55%),
         linear-gradient(155deg, rgba(251, 254, 250, 0.92) 0%, rgba(243, 249, 241, 0.92) 100%);
-      box-shadow: 0 14px 30px rgba(39, 62, 48, 0.2);
+      box-shadow: 0 16px 34px rgba(39, 62, 48, 0.22);
     }
     #${ROOT_ID} .head {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 11px 12px;
+      padding: 12px 13px;
       background: linear-gradient(160deg, #2f6f57 0%, #255946 100%);
       color: #f7fff9;
       font-weight: 600;
@@ -64,6 +70,32 @@ function ensureWidget() {
       font-size: 10px;
       opacity: 0.96;
     }
+    #${ROOT_ID} .toggle-btn {
+      border: 1px solid rgba(255, 255, 255, 0.28);
+      background: rgba(255, 255, 255, 0.08);
+      color: #f7fff9;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      line-height: 1;
+      padding: 4px 8px;
+      border-radius: 999px;
+      cursor: pointer;
+      text-decoration: none;
+      transition: background-color 0.18s ease, transform 0.15s ease, border-color 0.18s ease, opacity 0.18s ease;
+      opacity: 0.92;
+    }
+    #${ROOT_ID} .toggle-btn:hover {
+      background: rgba(255, 255, 255, 0.18);
+      border-color: rgba(255, 255, 255, 0.44);
+      transform: translateY(-0.5px);
+      opacity: 1;
+    }
+    #${ROOT_ID} .toggle-btn:focus-visible {
+      outline: none;
+      box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.25);
+    }
     #${ROOT_ID} .pill {
       padding: 2px 8px;
       border-radius: 999px;
@@ -73,7 +105,7 @@ function ensureWidget() {
       letter-spacing: 0.05em;
     }
     #${ROOT_ID} .body {
-      padding: 11px 12px;
+      padding: 12px 13px;
       display: grid;
       gap: 10px;
     }
@@ -83,34 +115,39 @@ function ensureWidget() {
     }
     #${ROOT_ID} .metric {
       flex: 1;
-      border: 1px solid #dbe4d8;
+      border: 1px solid #dbe7d8;
       border-radius: 12px;
-      padding: 9px;
-      background: rgba(255, 255, 255, 0.86);
+      padding: 10px;
+      background: #f8fcf7;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.65);
+      border-left: 4px solid #8ab59f;
     }
     #${ROOT_ID} .metric .label {
       font-size: 10px;
-      color: #5b6f61;
-      margin-bottom: 5px;
+      color: #5d7162;
+      margin: 0 0 6px 0;
       text-transform: uppercase;
-      letter-spacing: 0.07em;
+      letter-spacing: 0.06em;
       font-weight: 600;
     }
     #${ROOT_ID} .metric .value {
-      font-size: 20px;
+      font-size: 21px;
       font-weight: 700;
-      color: #1f2f25;
+      color: #223629;
       line-height: 1;
       letter-spacing: -0.02em;
+      margin-left: 0;
     }
     #${ROOT_ID} .line {
       font-size: 12px;
-      line-height: 1.45;
-      color: #2f4235;
-      background: rgba(255, 255, 255, 0.62);
-      border: 1px solid #deeadb;
-      border-radius: 10px;
-      padding: 8px;
+      line-height: 1.55;
+      color: #2f4335;
+      background: #f8fcf7;
+      border: 1px solid #dbe7d8;
+      border-radius: 12px;
+      padding: 10px;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.65);
+      border-left: 4px solid #8ab59f;
     }
     #${ROOT_ID} .status {
       font-size: 11px;
@@ -162,7 +199,7 @@ function ensureWidget() {
         <span>Codeat Insight</span>
         <span class="head-right">
           <span class="pill" id="codeat-verdict">-</span>
-          <span id="codeat-toggle">Hide</span>
+          <button id="codeat-toggle" class="toggle-btn" type="button">Hide</button>
         </span>
       </div>
       <div class="body" id="codeat-body">
@@ -182,11 +219,19 @@ function ensureWidget() {
   bodyEl = rootEl.querySelector("#codeat-body");
   statusEl = rootEl.querySelector("#codeat-status");
   analyzeAgainBtn = rootEl.querySelector("#codeat-analyze-again");
+  wireWidgetEvents();
+}
+
+function wireWidgetEvents() {
+  if (!rootEl || rootEl.dataset.wired === "true") {
+    return;
+  }
 
   const headEl = rootEl.querySelector("#codeat-head");
   setupDrag(headEl);
 
-  headEl.addEventListener("click", () => {
+  rootEl.querySelector("#codeat-toggle").addEventListener("click", (event) => {
+    event.stopPropagation();
     if (suppressNextToggle) {
       suppressNextToggle = false;
       return;
@@ -200,6 +245,8 @@ function ensureWidget() {
     event.stopPropagation();
     await refresh(true);
   });
+
+  rootEl.dataset.wired = "true";
 }
 
 function setupDrag(handleEl) {
@@ -211,6 +258,9 @@ function setupDrag(handleEl) {
 
   handleEl.addEventListener("pointerdown", (event) => {
     if (event.button !== 0) {
+      return;
+    }
+    if (event.target instanceof Element && event.target.closest("#codeat-toggle")) {
       return;
     }
 

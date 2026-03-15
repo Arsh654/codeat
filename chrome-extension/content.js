@@ -1,4 +1,5 @@
 const ROOT_ID = "codeat-floating-root";
+const POSITION_KEY = "codeat.widget.position.v1";
 
 let rootEl;
 let bodyEl;
@@ -7,6 +8,9 @@ let analyzeAgainBtn;
 let pending = false;
 let collapsed = false;
 let suppressNextToggle = false;
+let feedbackExpanded = false;
+let lastFeedback = "";
+let lastResult = null;
 
 const DRAG_THRESHOLD_PX = 5;
 
@@ -14,6 +18,8 @@ init();
 
 function init() {
   ensureWidget();
+  applyBuildVersion();
+  restorePosition();
   showWidget();
   setStatus("Click Analyze to run.");
 }
@@ -36,7 +42,7 @@ function ensureWidget() {
       bottom: 16px;
       right: 16px;
       z-index: 2147483647;
-      width: min(312px, calc(100vw - 24px));
+      width: min(382px, calc(100vw - 24px));
       font-family: "Plus Jakarta Sans", "Manrope", "Avenir Next", "Segoe UI", sans-serif;
       color: #1f2f25;
     }
@@ -62,6 +68,22 @@ function ensureWidget() {
       font-size: 13px;
       cursor: pointer;
       letter-spacing: 0.01em;
+    }
+    #${ROOT_ID} .head-left {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      min-width: 0;
+    }
+    #${ROOT_ID} .build-tag {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      opacity: 0.9;
+      border: 1px solid rgba(255, 255, 255, 0.35);
+      border-radius: 999px;
+      padding: 2px 6px;
+      line-height: 1;
     }
     #${ROOT_ID} .head-right {
       display: flex;
@@ -109,6 +131,11 @@ function ensureWidget() {
       display: grid;
       gap: 10px;
     }
+    #${ROOT_ID} .meta-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
     #${ROOT_ID} .metric-row {
       display: flex;
       gap: 10px;
@@ -149,6 +176,67 @@ function ensureWidget() {
       box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.65);
       border-left: 4px solid #8ab59f;
     }
+    #${ROOT_ID} .line-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+    #${ROOT_ID} .line .k {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #5d7162;
+      font-weight: 700;
+      margin-bottom: 0;
+    }
+    #${ROOT_ID} .line .v {
+      font-size: 12px;
+      color: #2f4335;
+      line-height: 1.45;
+      word-break: break-word;
+    }
+    #${ROOT_ID} .line-btns {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+    #${ROOT_ID} .chip-btn {
+      border: 1px solid #c5d7bf;
+      background: #f2f8f0;
+      color: #2d4e3f;
+      border-radius: 999px;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      padding: 4px 8px;
+      line-height: 1;
+      cursor: pointer;
+    }
+    #${ROOT_ID} .chip-btn:hover {
+      background: #e8f2e5;
+    }
+    #${ROOT_ID} .more-wrap {
+      border: 1px dashed #c9d8c5;
+      border-radius: 12px;
+      padding: 8px 10px;
+      background: rgba(245, 251, 243, 0.7);
+    }
+    #${ROOT_ID} .more-header {
+      display: flex;
+      justify-content: flex-end;
+      margin-bottom: 6px;
+    }
+    #${ROOT_ID} .more-body {
+      display: none;
+      gap: 8px;
+      grid-template-columns: 1fr;
+    }
+    #${ROOT_ID} .more-body.open {
+      display: grid;
+    }
     #${ROOT_ID} .status {
       font-size: 11px;
       color: #5f7364;
@@ -184,7 +272,7 @@ function ensureWidget() {
       #${ROOT_ID} {
         right: 8px;
         bottom: 8px;
-        width: min(300px, calc(100vw - 16px));
+        width: min(340px, calc(100vw - 16px));
       }
     }
   `;
@@ -196,7 +284,10 @@ function ensureWidget() {
   rootEl.innerHTML = `
     <div class="panel">
       <div class="head" id="codeat-head">
-        <span>Codeat Insight</span>
+        <span class="head-left">
+          <span>Codeat Insight</span>
+          <span class="build-tag" id="codeat-build">v?.?.?</span>
+        </span>
         <span class="head-right">
           <span class="pill" id="codeat-verdict">-</span>
           <button id="codeat-toggle" class="toggle-btn" type="button">Hide</button>
@@ -207,7 +298,36 @@ function ensureWidget() {
           <div class="metric"><div class="label">Correctness</div><div class="value" id="codeat-accuracy">--</div></div>
           <div class="metric"><div class="label">Confidence</div><div class="value" id="codeat-confidence">--</div></div>
         </div>
-        <div class="line" id="codeat-feedback">Feedback: Waiting for analysis...</div>
+        <div class="meta-row">
+          <div class="line">
+            <div class="k">LLM Used</div>
+            <div class="v" id="codeat-model">N/A</div>
+          </div>
+          <div class="line">
+            <div class="k">Analyzed At</div>
+            <div class="v" id="codeat-updated-at">--</div>
+          </div>
+        </div>
+        <div class="line">
+          <div class="line-head">
+            <div class="k">Feedback</div>
+            <div class="line-btns">
+              <button id="codeat-feedback-copy" class="chip-btn" type="button">Copy</button>
+              <button id="codeat-feedback-toggle" class="chip-btn" type="button">Expand</button>
+            </div>
+          </div>
+          <div class="v" id="codeat-feedback">Waiting for analysis...</div>
+        </div>
+        <div class="more-wrap">
+          <div class="more-header">
+            <button id="codeat-more-toggle" class="chip-btn" type="button">Show More Metrics</button>
+          </div>
+          <div class="more-body" id="codeat-more-body">
+            <div class="line"><div class="k">Compile Likely Valid</div><div class="v" id="codeat-compile">--</div></div>
+            <div class="line"><div class="k">Style Score</div><div class="v" id="codeat-style-score">--</div></div>
+            <div class="line"><div class="k">Review Summary</div><div class="v" id="codeat-review-summary">--</div></div>
+          </div>
+        </div>
         <div class="actions"><button id="codeat-analyze-again" class="analyze-btn" type="button">Analyze</button></div>
         <div class="status" id="codeat-status">Click Analyze to run.</div>
       </div>
@@ -245,6 +365,9 @@ function wireWidgetEvents() {
     event.stopPropagation();
     await refresh(true);
   });
+  rootEl.querySelector("#codeat-feedback-copy").addEventListener("click", onCopyFeedback);
+  rootEl.querySelector("#codeat-feedback-toggle").addEventListener("click", onToggleFeedback);
+  rootEl.querySelector("#codeat-more-toggle").addEventListener("click", onToggleMoreMetrics);
 
   rootEl.dataset.wired = "true";
 }
@@ -305,6 +428,7 @@ function setupDrag(handleEl) {
     dragging = false;
     if (moved) {
       suppressNextToggle = true;
+      persistPosition();
     }
     handleEl.releasePointerCapture(pointerId);
     pointerId = null;
@@ -370,6 +494,11 @@ function renderResult(result, updatedAt) {
   const confidenceEl = rootEl.querySelector("#codeat-confidence");
   const verdictEl = rootEl.querySelector("#codeat-verdict");
   const feedbackEl = rootEl.querySelector("#codeat-feedback");
+  const modelEl = rootEl.querySelector("#codeat-model");
+  const updatedAtEl = rootEl.querySelector("#codeat-updated-at");
+  const compileEl = rootEl.querySelector("#codeat-compile");
+  const styleScoreEl = rootEl.querySelector("#codeat-style-score");
+  const reviewSummaryEl = rootEl.querySelector("#codeat-review-summary");
 
   const verdict = (result.leetcodeLikelyVerdict || "N/A").toUpperCase();
   const accuracyText = typeof result.accuracyPercentage === "number" ? `${Math.round(result.accuracyPercentage)}%` : "--";
@@ -378,10 +507,29 @@ function renderResult(result, updatedAt) {
   accuracyEl.textContent = accuracyText;
   confidenceEl.textContent = confidenceText;
   verdictEl.textContent = verdict;
-  feedbackEl.textContent = `Feedback: ${truncate(result.feedback || "No feedback returned.", 140)}`;
+  modelEl.textContent = (result.modelUsed || "").trim() || "N/A";
+  updatedAtEl.textContent = formatUpdatedAt(updatedAt);
+  lastResult = result;
+  lastFeedback = (result.feedback || "No feedback returned.").trim();
+  feedbackEl.textContent = feedbackExpanded ? lastFeedback : truncate(lastFeedback, 180);
+  compileEl.textContent = typeof result.compileLikelyValid === "boolean" ? (result.compileLikelyValid ? "Yes" : "No") : "N/A";
+  styleScoreEl.textContent = typeof result.styleScorePercentage === "number" ? `${Math.round(result.styleScorePercentage)}%` : "N/A";
+  reviewSummaryEl.textContent = (result.reviewSummary || "").trim() || "No review summary available.";
+  syncFeedbackToggleLabel();
 
   verdictEl.style.background = verdictColor(verdict);
   setStatus(updatedAt ? `Updated ${new Date(updatedAt).toLocaleTimeString()}` : "Updated", false);
+}
+
+function formatUpdatedAt(updatedAt) {
+  if (!updatedAt) {
+    return "--";
+  }
+  const parsed = new Date(updatedAt);
+  if (Number.isNaN(parsed.getTime())) {
+    return "--";
+  }
+  return parsed.toLocaleTimeString();
 }
 
 function verdictColor(verdict) {
@@ -394,6 +542,97 @@ function verdictColor(verdict) {
 function setStatus(message, isError = false) {
   statusEl.textContent = message;
   statusEl.classList.toggle("error", Boolean(isError));
+}
+
+function onToggleFeedback(event) {
+  event.stopPropagation();
+  feedbackExpanded = !feedbackExpanded;
+  const feedbackEl = rootEl.querySelector("#codeat-feedback");
+  if (feedbackEl) {
+    feedbackEl.textContent = feedbackExpanded ? (lastFeedback || "No feedback returned.") : truncate(lastFeedback || "No feedback returned.", 180);
+  }
+  syncFeedbackToggleLabel();
+}
+
+async function onCopyFeedback(event) {
+  event.stopPropagation();
+  const text = (lastFeedback || "").trim();
+  if (!text) {
+    setStatus("No feedback to copy.", true);
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(text);
+    setStatus("Feedback copied.");
+  } catch (err) {
+    setStatus("Copy failed. Clipboard blocked on this page.", true);
+  }
+}
+
+function onToggleMoreMetrics(event) {
+  event.stopPropagation();
+  const body = rootEl.querySelector("#codeat-more-body");
+  const btn = rootEl.querySelector("#codeat-more-toggle");
+  if (!body || !btn) {
+    return;
+  }
+  const isOpen = body.classList.toggle("open");
+  btn.textContent = isOpen ? "Hide More Metrics" : "Show More Metrics";
+}
+
+function syncFeedbackToggleLabel() {
+  const toggleBtn = rootEl.querySelector("#codeat-feedback-toggle");
+  if (toggleBtn) {
+    toggleBtn.textContent = feedbackExpanded ? "Collapse" : "Expand";
+  }
+}
+
+function applyBuildVersion() {
+  const buildEl = rootEl?.querySelector("#codeat-build");
+  if (!buildEl) {
+    return;
+  }
+  try {
+    const version = chrome.runtime.getManifest()?.version || "?.?.?";
+    buildEl.textContent = `v${version}`;
+  } catch (err) {
+    buildEl.textContent = "v?.?.?";
+  }
+}
+
+async function persistPosition() {
+  if (!rootEl) {
+    return;
+  }
+  const left = parseFloat(rootEl.style.left);
+  const top = parseFloat(rootEl.style.top);
+  if (!Number.isFinite(left) || !Number.isFinite(top)) {
+    return;
+  }
+  try {
+    await chrome.storage.local.set({ [POSITION_KEY]: { left, top } });
+  } catch (err) {
+    // Ignore storage errors
+  }
+}
+
+async function restorePosition() {
+  try {
+    const stored = await chrome.storage.local.get(POSITION_KEY);
+    const pos = stored?.[POSITION_KEY];
+    if (!pos || !Number.isFinite(pos.left) || !Number.isFinite(pos.top)) {
+      return;
+    }
+    const rect = rootEl.getBoundingClientRect();
+    const maxLeft = Math.max(0, window.innerWidth - rect.width);
+    const maxTop = Math.max(0, window.innerHeight - rect.height);
+    rootEl.style.right = "auto";
+    rootEl.style.bottom = "auto";
+    rootEl.style.left = `${clamp(pos.left, 0, maxLeft)}px`;
+    rootEl.style.top = `${clamp(pos.top, 0, maxTop)}px`;
+  } catch (err) {
+    // Ignore storage errors
+  }
 }
 
 function showWidget() {

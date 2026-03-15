@@ -17,6 +17,8 @@ const els = {
   confidenceValue: document.getElementById("confidenceValue"),
   verdictPill: document.getElementById("verdictPill"),
   compileLikely: document.getElementById("compileLikely"),
+  modelUsedValue: document.getElementById("modelUsedValue"),
+  analyzedAtValue: document.getElementById("analyzedAtValue"),
   feedbackText: document.getElementById("feedbackText"),
   strengthList: document.getElementById("strengthList"),
   improvementList: document.getElementById("improvementList"),
@@ -151,7 +153,7 @@ async function onAnalyze() {
       });
 
       if (response && response.status === "ok" && response.result) {
-        renderResult(response.result);
+        renderResult(response.result, response.updatedAt);
         setStatus("Analysis complete.");
         return;
       }
@@ -310,7 +312,7 @@ function populateForm(extracted) {
   }
 }
 
-function renderResult(data) {
+function renderResult(data, updatedAt = null) {
   const verdict = (data.leetcodeLikelyVerdict || "UNCERTAIN").toUpperCase();
 
   els.accuracyValue.textContent = toPercent(data.accuracyPercentage);
@@ -321,6 +323,8 @@ function renderResult(data) {
   els.compileLikely.textContent = typeof data.compileLikelyValid === "boolean"
     ? (data.compileLikelyValid ? "Yes" : "No")
     : "N/A";
+  els.modelUsedValue.textContent = (data.modelUsed || "").trim() || "N/A";
+  els.analyzedAtValue.textContent = formatAnalyzedAt(updatedAt);
   els.feedbackText.textContent = data.feedback || "No feedback provided.";
 
   renderList(els.strengthList, (data.strengths || []).slice(0, 3), "No strengths provided.");
@@ -343,6 +347,8 @@ function clearResult() {
   els.confidenceValue.textContent = "N/A";
   els.verdictPill.textContent = "-";
   els.compileLikely.textContent = "N/A";
+  els.modelUsedValue.textContent = "N/A";
+  els.analyzedAtValue.textContent = "N/A";
   els.feedbackText.textContent = "No analysis available.";
   renderList(els.strengthList, [], "No strengths provided.");
   renderList(els.improvementList, [], "No improvements provided.");
@@ -441,6 +447,16 @@ function disableActions(disabled) {
   els.analyzeNow.disabled = disabled;
   els.analyzeAgain.disabled = disabled;
   els.extractCode.disabled = disabled;
+}
+
+function formatAnalyzedAt(updatedAt) {
+  if (updatedAt) {
+    const parsed = new Date(updatedAt);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed.toLocaleTimeString();
+    }
+  }
+  return new Date().toLocaleTimeString();
 }
 
 function setStatus(message, isError = false) {

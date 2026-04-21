@@ -80,20 +80,10 @@ function isAnalyzableUrl(url) {
   if (!url) {
     return false;
   }
-  const supportedPlatforms = [
-    "leetcode.com",
-    "hackerrank.com",
-    "geeksforgeeks.org",
-    "codeforces.com",
-    "interviewbit.com",
-    "lintcode.com",
-    "localhost",
-    "127.0.0.1"
-  ];
   try {
     const parsedUrl = new URL(url);
     const hostname = parsedUrl.hostname.toLowerCase();
-    return supportedPlatforms.some(platform => hostname === platform || hostname.endsWith("." + platform));
+    return hostname === "leetcode.com" || hostname.endsWith(".leetcode.com");
   } catch (e) {
     return false;
   }

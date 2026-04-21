@@ -11,14 +11,8 @@
   "content_scripts": [
     {
       "matches": [
-        "*://*.leetcode.com/*",
-        "*://*.hackerrank.com/*",
-        "*://*.geeksforgeeks.org/*",
-        "*://*.codeforces.com/*",
-        "*://*.interviewbit.com/*",
-        "*://*.lintcode.com/*",
-        "*://localhost/*",
-        "*://127.0.0.1/*"
+        "*://leetcode.com/*",
+        "*://*.leetcode.com/*"
       ],
       "js": ["content.js"],
       "run_at": "document_idle"

@@ -12,7 +12,39 @@ API service to evaluate DSA submissions across multiple languages (C++, Java, Py
 - Spring Boot 4
 - Maven
 
+## Project Status
+
+Codeat is open source and usable in local development today.
+
+- Backend/API: MVP-ready for local use and contributor iteration
+- Chrome extension: included in `chrome-extension/`
+- Auth: current API routes are intentionally open in local MVP mode
+
+## Prerequisites
+
+- Java 17+
+- A supported LLM provider key (`groq`, `openai`, `openrouter`, or `cerebras`)
+- Chrome or another Chromium-based browser if you want to load the extension
+
 ## Run Locally
+
+1. Copy the example environment file:
+
+```bash
+cp env.example env.txt
+```
+
+2. Fill in the provider and API key values in `env.txt`.
+
+3. Load those variables into your shell:
+
+```bash
+set -a
+source env.txt
+set +a
+```
+
+4. Start the backend:
 
 ```bash
 ./mvnw spring-boot:run
@@ -20,13 +52,16 @@ API service to evaluate DSA submissions across multiple languages (C++, Java, Py
 
 Service runs on port `3502` (see `src/main/resources/application.yml`).
 
+5. Optional: load the extension from `chrome-extension/` using `chrome://extensions` -> `Load unpacked`.
+
+## Local Security Notes
+
+- The current MVP backend permits all API requests in local mode.
+- Because Spring Security is on the classpath, Spring Boot may still print a generated development password on startup.
+- That password is not part of Codeat's intended API flow here; it is safe to ignore for local development.
+- Do not treat the current security setup as production-ready authentication.
+
 ## Environment Variables
-
-Start from the example file and create your local env config:
-
-```bash
-cp env.example env.txt
-```
 
 ```bash
 # Primary LLM Provider: openai | groq | openrouter | cerebras
@@ -61,6 +96,15 @@ Provider defaults:
 - `groq` -> `https://api.groq.com/openai/v1/chat/completions`
 - `openrouter` -> `https://openrouter.ai/api/v1/chat/completions`
 - `cerebras` -> `https://api.cerebras.ai/v1/chat/completions`
+
+### Quickstart Example
+
+```bash
+cp env.example env.txt
+$EDITOR env.txt
+set -a && source env.txt && set +a
+./mvnw spring-boot:run
+```
 
 ### Provider Comparison
 

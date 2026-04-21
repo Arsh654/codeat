@@ -13,18 +13,26 @@
 	<version>0.0.1-SNAPSHOT</version>
 	<name>codeat</name>
 	<description>Project for checking correctness of DSA algo</description>
-	<url/>
+	<url>https://github.com/Arsh654/codeat</url>
 	<licenses>
-		<license/>
+		<license>
+			<name>Apache License, Version 2.0</name>
+			<url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
+			<distribution>repo</distribution>
+		</license>
 	</licenses>
 	<developers>
-		<developer/>
+		<developer>
+			<id>Arsh654</id>
+			<name>Arshad</name>
+			<url>https://github.com/Arsh654</url>
+		</developer>
 	</developers>
 	<scm>
-		<connection/>
-		<developerConnection/>
-		<tag/>
-		<url/>
+		<connection>scm:git:https://github.com/Arsh654/codeat.git</connection>
+		<developerConnection>scm:git:ssh://git@github.com/Arsh654/codeat.git</developerConnection>
+		<tag>HEAD</tag>
+		<url>https://github.com/Arsh654/codeat</url>
 	</scm>
 	<properties>
 		<java.version>17</java.version>
